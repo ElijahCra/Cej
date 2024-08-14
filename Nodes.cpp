@@ -3,6 +3,7 @@
 //
 
 #include <string>
+#include <utility>
 #include <vector>
 #include <memory>
 
@@ -20,40 +21,40 @@ enum class DataType {
 class ASTNode {
   public:
   virtual ~ASTNode() = default;
-  virtual NodeType getType() const = 0;
+  [[nodiscard]] virtual NodeType getType() const = 0;
 };
 
-class ConstantNode : public ASTNode {
+class ConstantNode : public ASTNode { //literal
   public:
-  ConstantNode(int value, DataType type) : value(value), dataType(type) {}
-  NodeType getType() const override { return NodeType::Constant; }
+  ConstantNode(const int value, const DataType type) : value(value), dataType(type) {}
+  [[nodiscard]] NodeType getType() const override { return NodeType::Constant; }
   int value;
   DataType dataType;
 };
 
-class VariableNode : public ASTNode {
+class VariableNode final : public ASTNode { // var x
   public:
-  VariableNode(const std::string& name, DataType type) : name(name), dataType(type) {}
-  NodeType getType() const override { return NodeType::Variable; }
+  VariableNode(std::string  name, DataType type) : name(std::move(name)), dataType(type) {}
+  [[nodiscard]] NodeType getType() const override { return NodeType::Variable; }
   std::string name;
   DataType dataType;
 };
 
-class BinaryOpNode : public ASTNode {
+class BinaryOpNode final : public ASTNode {
   public:
   BinaryOpNode(char op, std::unique_ptr<ASTNode> left, std::unique_ptr<ASTNode> right)
       : op(op), left(std::move(left)), right(std::move(right)) {}
-  NodeType getType() const override { return NodeType::BinaryOp; }
+  [[nodiscard]] NodeType getType() const override { return NodeType::BinaryOp; }
   char op;
   std::unique_ptr<ASTNode> left;
   std::unique_ptr<ASTNode> right;
 };
 
-class AssignmentNode : public ASTNode {
+class AssignmentNode final : public ASTNode {
   public:
   AssignmentNode(std::unique_ptr<VariableNode> var, std::unique_ptr<ASTNode> value)
       : variable(std::move(var)), value(std::move(value)) {}
-  NodeType getType() const override { return NodeType::Assignment; }
+  [[nodiscard]] NodeType getType() const override { return NodeType::Assignment; }
   std::unique_ptr<VariableNode> variable;
   std::unique_ptr<ASTNode> value;
 };

@@ -30,11 +30,11 @@ private:
         }
     }
 
-    void generateConstant(const ConstantNode* node, std::ostringstream& oss) {
+    static void generateConstant(const ConstantNode* node, std::ostringstream& oss) {
         oss << "    mov r0, #" << node->value << "\n";
     }
 
-    void generateVariable(const VariableNode* node, std::ostringstream& oss) {
+    static void generateVariable(const VariableNode* node, std::ostringstream& oss) {
         oss << "    ldr r0, =" << node->name << "\n";
     }
 

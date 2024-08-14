@@ -5,4 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_executable(CejCompiler main.cpp
         Nodes.cpp
-        Generator.cpp)
+        Generator.cpp
+        Parser.cpp
+        Lexer.cpp
+        Compiler.cpp)
