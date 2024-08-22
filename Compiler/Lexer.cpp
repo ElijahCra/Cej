@@ -11,7 +11,7 @@ enum class TokenKind { TK_EOF, TK_PNT, TK_INT };
 
 struct Token {
   TokenKind kind;
-  std::variant<int,char, std::nullptr_t> value;
+  std::string value;
 };
 
 class Lexer {
@@ -24,7 +24,7 @@ class Lexer {
       } else if (std::isdigit(input.front())) {
         tokens.emplace_back(TK_INT, parseInt(input));
       } else if (std::ispunct(input.front())) {
-        tokens.emplace_back(TK_PNT, input.front());
+        tokens.emplace_back(TK_PNT, std::string{input.front()});
         input.remove_prefix(1);
       } else {
         throw std::runtime_error("Unexpected character: " + input.front());
@@ -35,15 +35,14 @@ class Lexer {
     return tokens;
   }
 
-  static int parseInt(std::string_view& input) {
-    int result = 0;
-
+  static std::string parseInt(std::string_view& input) {
+    std::string_view copy = input;
     while (!input.empty()  && (std::isdigit(input.front()) || std::isspace(input.front()))) {
-      if (!std::isspace(input.front())) {
-        result = result * 10 + (input.front() - '0');
-      }
       input.remove_prefix(1);
     }
-    return result;
+    std::string str(copy.begin(), input.begin());
+    std::erase_if(str, isspace);
+    return str;
+
   }
 };
