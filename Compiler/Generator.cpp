@@ -4,7 +4,57 @@
 #include <sstream>
 #include "Nodes.cpp"
 
-class ARMCodeGenerator {
+void
+WalkTree(Node *node)
+{
+    switch (node->kind) {
+        case ND_INT:
+            printf("\tmov x0, #%d\n", node->value);
+        return;
+        case ND_NEG:
+            WalkTree(node->lhs);
+        printf("\tneg x0, x0\n");
+        return;
+    }
+
+    WalkTree(node->rhs);
+    printf("\tstr x0, [sp, #-16]!\n");
+    WalkTree(node->lhs);
+    printf("\tldr x1, [sp], #16\n");
+
+    switch (node->kind) {
+        case ND_ADD:
+            printf("\tadd x0, x0, x1\n");
+        return;
+        case ND_SUB:
+            printf("\tsub x0, x0, x1\n");
+        return;
+        case ND_MUL:
+            printf("\tmul x0, x0, x1\n");
+        return;
+        case ND_DIV:
+            printf("\tsdiv x0, x0, x1\n");
+        return;
+    }
+
+    Error("invalid expression");
+}
+
+void
+AssemblyFromTree(Node *tree)
+{
+    printf("\t.globl _main\n");
+    printf("\t.align 4\n");
+    printf("_main:\n");
+
+    WalkTree(tree);
+
+    printf("\tmov x16, #1\n");
+    printf("\tsvc #0x80\n");
+}
+
+
+class ARMGenerator {
 public:
     std::string generateCode(const ASTNode* node) {
         std::ostringstream oss;
