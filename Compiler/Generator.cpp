@@ -1,13 +1,15 @@
 //
 // Created by Elijah on 8/12/2024.
 //
+module;
 #ifndef GENERATOR_CPP
 #define GENERATOR_CPP
-#include <sstream>
-#include "Parser.cpp"
 
-struct Node;
-class Generator {
+#include <sstream>
+import Parser;
+
+export module Generator;
+export class Generator {
 public:
 
 static void

@@ -1,20 +1,18 @@
 //
 // Created by Elijah on 8/13/2024.
 //
-#include <cassert>
-#include <utility>
+module;
 #ifndef PARSER_CPP
 #define PARSER_CPP
 
-#include <fstream>
-#include <memory>
-#include <optional>
-#include <sstream>
-#include <vector>
-#include <stdexcept>
-#include "Lexer.cpp"
 
-enum class NodeKind {
+#include <cassert>
+#include <fstream>
+#include <optional>
+#include <stdexcept>
+import Lexer;
+export module Parser;
+export enum class NodeKind {
 	ND_ADD,
 	ND_SUB,
 	ND_MUL,
@@ -23,14 +21,14 @@ enum class NodeKind {
 	ND_INT
 };
 
-struct Node {
+export struct Node {
 	NodeKind kind;
 	std::unique_ptr<Node> lhs;
 	std::unique_ptr<Node> rhs;
 	std::optional<int> value;
 };
 
-class Parser {
+export class Parser {
     public:
 
     static std::unique_ptr<Node>

@@ -1,24 +1,25 @@
 //
 // Created by Elijah on 8/13/2024.
 //
+module;
 #ifndef LEXER_CPP
 #define LEXER_CPP
 
 #include <memory>
 #include <string_view>
 #include <vector>
-#include <variant>
 #include <stdexcept>
+export module Lexer;
 
-enum class TokenKind { TK_EOF, TK_PNT, TK_INT };
+export enum class TokenKind { TK_EOF, TK_PNT, TK_INT };
 
-struct Token {
+export struct Token {
   TokenKind kind;
   std::string literal;
   std::unique_ptr<Token> next;
 };
 
-class TokenList {
+export class TokenList {
   public:
   std::unique_ptr<Token> head;
   explicit TokenList(std::unique_ptr<Token> head) : head(std::move(head)) {}
@@ -46,7 +47,7 @@ class TokenList {
   [[nodiscard]] static Iterator end() { return Iterator(nullptr); }
 };
 
-class Lexer {
+export class Lexer {
   public:
 
   static std::unique_ptr<Token> MakeToken(const TokenKind kind, const std::string_view str) {
