@@ -1,13 +1,18 @@
 //
 // Created by Elijah on 8/13/2024.
 //
+#include <cassert>
+#include <utility>
+#ifndef PARSER_CPP
+#define PARSER_CPP
+
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <vector>
 #include <stdexcept>
 #include "Lexer.cpp"
-#include "Nodes.cpp"
 
 enum class NodeKind {
 	ND_ADD,
@@ -20,125 +25,131 @@ enum class NodeKind {
 
 struct Node {
 	NodeKind kind;
-	std::optional<Node*> lhs;
-	std::optional<Node*> rhs;
+	std::unique_ptr<Node> lhs;
+	std::unique_ptr<Node> rhs;
 	std::optional<int> value;
 };
 
-Node* MakeNode(const NodeKind kind) {
-	return new Node{kind, std::nullopt, std::nullopt, std::nullopt};
-}
+class Parser {
+    public:
 
-Node *
-MakeUnaryNode(NodeKind kind, Node *lhs)
-{
-    Node *node = MakeNode(kind);
-    node->lhs = lhs;
-    return node;
-}
+    static std::unique_ptr<Node>
+    MakeNode(const NodeKind kind) {
+            return std::make_unique<Node>(kind, nullptr, nullptr, std::nullopt);
+        }
 
-Node *
-MakeBinaryNode(NodeKind kind, Node *lhs, Node *rhs)
-{
-    Node *node = MakeNode(kind);
-    node->lhs = lhs;
-    node->rhs = rhs;
-    return node;
-}
-
-Node *
-MakeIntegerNode(int value)
-{
-    Node *node = MakeNode(NodeKind::ND_INT);
-    node->value = value;
-    return node;
-}
-
-Node *ParseAdditiveExpression(Token *token, Token **advance);
-Node *ParseMultiplicativeExpression(Token *token, Token **advance);
-Node *ParseUnaryExpression(Token *token, Token **advance);
-Node *ParsePrimaryExpression(Token *token, Token **advance);
-
-/*
- *  Additive = Multiplicative ( "+" Multiplicative | "+" Multiplicative ) *
- */
-Node *
-ParseAdditiveExpression(Token *token, Token **advance)
-{
-    Node *node = ParseMultiplicativeExpression(token, &token);
-
-    while (true) {
-	if (Equal(token, "+")) {
-	    node = MakeBinaryNode(ND_ADD, node, ParseMultiplicativeExpression(token->next, &token));
-	} else if (Equal(token, "-")) {
-	    node = MakeBinaryNode(ND_SUB, node, ParseMultiplicativeExpression(token->next, &token));
-	} else {
-	    *advance = token;
-	    return node;
-	}
-    }
-}
-
-/*
- *  Multiplicative = Unary ( "*" Unary | "/" Unary ) *
- */
-Node *
-ParseMultiplicativeExpression(Token *token, Token **advance)
-{
-    Node *node = ParseUnaryExpression(token, &token);
-
-    while (true) {
-	if (Equal(token, "*")) {
-	    node = MakeBinaryNode(ND_MUL, node, ParseUnaryExpression(token->next, &token));
-	} else if (Equal(token, "/")) {
-	    node = MakeBinaryNode(ND_DIV, node, ParseUnaryExpression(token->next, &token));
-	} else {
-	    *advance = token;
-	    return node;
-	}
-    }
-}
-
-/*
- *  Unary = ( "+" | "-" ) ( Unary | Primary )
- */
-Node *
-ParseUnaryExpression(Token *token, Token **advance)
-{
-    if (Equal(token, "+")) {
-	return ParseUnaryExpression(token->next, advance);
-    } else if (Equal(token, "-")) {
-	return MakeUnaryNode(ND_NEG, ParseUnaryExpression(token->next, advance));
-    } else {
-	return ParsePrimaryExpression(token, advance);
-    }
-}
-
-/*
- *  Primary = "(" Additive ")" | Integer
- */
-Node *
-ParsePrimaryExpression(Token *token, Token **advance)
-{
-    if (Equal(token, "(")) {
-	Node *node = ParseAdditiveExpression(token->next, &token);
-	*advance = Expect(token, ")");
-	return node;
+    static std::unique_ptr<Node>
+    MakeUnaryNode(const NodeKind kind, std::unique_ptr<Node> lhs) {
+        auto node = MakeNode(kind);
+        node->lhs = std::move(lhs);
+        return node;
     }
 
-    if (token->kind == TK_INT) {
-	Node *node = MakeIntegerNode(token->value);
-	*advance = token->next;
-	return node;
+    static std::unique_ptr<Node>
+    MakeBinaryNode(const NodeKind kind, std::unique_ptr<Node> lhs, std::unique_ptr<Node> rhs) {
+        auto node = MakeNode(kind);
+        node->lhs = std::move(lhs);
+        node->rhs = std::move(rhs);
+        return node;
     }
 
-    Error("expected an expression");
+    static std::unique_ptr<Node>
+    MakeIntegerNode(int value) {
+        auto node = MakeNode(NodeKind::ND_INT);
+        node->value = value;
+        return node;
+    }
 
-    return NULL;
-}
 
-Node *
-TreeFromTokens(Token **tokens)
-{
-    return ParseAdditiveExpression(*tokens, tokens);
-}
+    static bool
+    Equal(const Token* token, const std::string_view str) {
+        return token->kind == TokenKind::TK_PNT && token->literal == str;
+    }
+
+    static std::unique_ptr<Token>
+    Expect(std::unique_ptr<Token>& token, const std::string_view expected) {
+        if (!Equal(token.get(), expected)) {
+            throw std::runtime_error("Expected '" + std::string(expected) + "', but got '" + token->literal + "'");
+        }
+        return std::exchange(token, std::move(token->next));
+    }
+
+    static std::unique_ptr<Node>
+    ParseAdditiveExpression(std::unique_ptr<Token>& token) { using enum NodeKind;
+        auto node = ParseMultiplicativeExpression(token);
+
+        while (true) {
+            if (Equal(token.get(), "+")) {
+                auto next = std::move(token->next);
+                node = MakeBinaryNode(ND_ADD, std::move(node), ParseMultiplicativeExpression(next));
+                token = std::move(next);
+            } else if (Equal(token.get(), "-")) {
+                auto next = std::move(token->next);
+                node = MakeBinaryNode(ND_SUB, std::move(node), ParseMultiplicativeExpression(next));
+                token = std::move(next);
+            } else {
+                return node;
+            }
+        }
+    }
+
+    static std::unique_ptr<Node>
+    ParseMultiplicativeExpression(std::unique_ptr<Token>& token) {
+        using enum NodeKind;
+        auto node = ParseUnaryExpression(token);
+
+        while (true) {
+            if (Equal(token.get(), "*")) {
+                auto next = std::move(token->next);
+                node = MakeBinaryNode(ND_MUL, std::move(node), ParseUnaryExpression(next));
+                token = std::move(next);
+            } else if (Equal(token.get(), "/")) {
+                auto next = std::move(token->next);
+                node = MakeBinaryNode(ND_DIV, std::move(node), ParseUnaryExpression(next));
+                token = std::move(next);
+            } else {
+                return node;
+            }
+        }
+    }
+
+    static std::unique_ptr<Node>
+    ParseUnaryExpression(std::unique_ptr<Token>& token) {
+        using enum NodeKind;
+        if (Equal(token.get(), "+")) {
+            token = std::move(token->next);
+            return ParseUnaryExpression(token);
+        } else if (Equal(token.get(), "-")) {
+            token = std::move(token->next);
+            return MakeUnaryNode(ND_NEG, ParseUnaryExpression(token));
+        } else {
+            return ParsePrimaryExpression(token);
+        }
+    }
+
+    static std::unique_ptr<Node>
+    ParsePrimaryExpression(std::unique_ptr<Token>& token) {
+        using enum TokenKind;
+        if (Equal(token.get(), "(")) {
+            token = std::move(token->next);
+            auto node = ParseAdditiveExpression(token);
+            Expect(token, ")");
+            return node;
+        }
+        if (token->kind == TK_INT) {
+            auto node = MakeIntegerNode(std::stoi(token->literal));
+            token = std::move(token->next);
+            return node;
+        }
+        throw std::runtime_error("Expected an expression");
+    }
+    static std::unique_ptr<Node> TreeFromTokens(std::unique_ptr<Token> tokens) {
+        auto tree = ParseAdditiveExpression(tokens);
+        assert(tokens->kind == TokenKind::TK_EOF);
+        return tree;
+    }
+};
+
+
+
+#endif //PARSER_CPP

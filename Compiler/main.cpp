@@ -1,23 +1,18 @@
+#include <format>
 #include <iostream>
 #include "Generator.cpp"
+#include "Parser.cpp"
+#include "Lexer.cpp"
 
 /* Driver */
 
 int
-main(int argc, char *argv[])
+main()
 {
-    if (argc != 2) {
-        Error("usage: %s <program>", argv[0]);
-    }
-
-    Token *tokens = TokensFromString(argv[1]);
-    Node *tree = TreeFromTokens(&tokens);
-
-    if (tokens->kind != TK_EOF) {
-        Error("unconsumed tokens");
-    }
-
-    AssemblyFromTree(tree);
+    std::string input = "123 + 456";
+    std::unique_ptr<Token> tokens = Lexer::TokensFromString(input);
+    std::unique_ptr<Node> tree = Parser::TreeFromTokens(std::move(tokens));
+    Generator::AssemblyFromTree(std::move(tree));
 
     return 0;
 }

@@ -12,6 +12,7 @@ enable_testing()
 add_executable(
         hello_test
         LexerTest.cpp
+        ParserTest.cpp
 )
 target_link_libraries(
         hello_test
