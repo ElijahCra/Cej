@@ -9,7 +9,7 @@
 int
 main()
 {
-    std::string input = "123 + 456";
+    std::string input = "x : int : 5; main :: () int {return x;}";
     std::unique_ptr<Token> tokens = Lexer::TokensFromString(input);
     std::unique_ptr<Node> tree = Parser::TreeFromTokens(std::move(tokens));
     Generator::AssemblyFromTree(std::move(tree));
