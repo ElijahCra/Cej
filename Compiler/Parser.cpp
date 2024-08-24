@@ -9,10 +9,21 @@
 #include <fstream>
 #include <memory>
 #include <optional>
-#include <sstream>
+#include <unordered_map>
 #include <vector>
 #include <stdexcept>
 #include "Lexer.cpp"
+
+
+
+struct StringHash {
+    using is_transparent = void; // Enables heterogeneous operations.
+
+    std::size_t operator()(std::string_view sv) const {
+        std::hash<std::string_view> hasher;
+        return hasher(sv);
+    }
+};
 
 enum class NodeKind {
 	ND_ADD,
@@ -20,19 +31,30 @@ enum class NodeKind {
 	ND_MUL,
 	ND_DIV,
 	ND_NEG,
-	ND_INT
+	ND_INT,
+    ND_VAR,
+    ND_ASSIGN,
+    ND_RETURN,
+    ND_BLOCK,
+    ND_FUNCTION,
+    ND_VARDECL
 };
 
 struct Node {
-	NodeKind kind;
-	std::unique_ptr<Node> lhs;
-	std::unique_ptr<Node> rhs;
-	std::optional<int> value;
+    NodeKind kind;
+    std::unique_ptr<Node> lhs;
+    std::unique_ptr<Node> rhs;
+    std::optional<int> value;
+    std::string name;  // For var and function names
+    std::vector<std::unique_ptr<Node>> block;  // For block statements
+    std::vector<std::string> params;  // For function parameters
+    std::string type;  // For variable and function return types
 };
 
 class Parser {
-    public:
 
+    public:
+    static std::unordered_map<std::string, int, StringHash, std::equal_to<>> variables;
     static std::unique_ptr<Node>
     MakeNode(const NodeKind kind) {
             return std::make_unique<Node>(kind, nullptr, nullptr, std::nullopt);
@@ -63,7 +85,7 @@ class Parser {
 
     static bool
     Equal(const Token* token, const std::string_view str) {
-        return token->kind == TokenKind::TK_PNT && token->literal == str;
+        return token->literal == str;
     }
 
     static std::unique_ptr<Token>
@@ -132,7 +154,7 @@ class Parser {
         using enum TokenKind;
         if (Equal(token.get(), "(")) {
             token = std::move(token->next);
-            auto node = ParseAdditiveExpression(token);
+            auto node = ParseExpression(token);
             Expect(token, ")");
             return node;
         }
@@ -141,13 +163,119 @@ class Parser {
             token = std::move(token->next);
             return node;
         }
+        if (token->kind == TK_IDENTIFIER) {
+            auto node = MakeNode(NodeKind::ND_VAR);
+            node->name = token->literal;
+            token = std::move(token->next);
+            return node;
+        }
         throw std::runtime_error("Expected an expression");
     }
+    static std::unique_ptr<Node>
+    ParseProgram(std::unique_ptr<Token>& token) { using enum TokenKind;
+        auto program = MakeNode(NodeKind::ND_BLOCK);
+
+        while (token->kind != TK_EOF) {
+            if (token->kind == TK_IDENTIFIER) {
+                if (token->next && token->next->kind == TK_COLONCOLON) {
+                    program->block.push_back(ParseFunction(token));
+                } else {
+                    program->block.push_back(ParseVarDecl(token));
+                }
+            } else {
+                throw std::runtime_error("Unexpected token at program level");
+            }
+        }
+
+        return program;
+    }
+
+    static std::unique_ptr<Node>
+    ParseVarDecl(std::unique_ptr<Token>& token) {
+        auto node = MakeNode(NodeKind::ND_VARDECL);
+        node->name = token->literal;
+        token = std::move(token->next);
+
+        Expect(token, ":");
+        node->type = Expect(token, "int")->literal;
+
+        Expect(token, "=");
+        node->rhs = ParseExpression(token);
+
+        Expect(token, ";");
+        variables[node->name] = 0;  // Initialize variable
+        return node;
+    }
+
+    static std::unique_ptr<Node>
+    ParseFunction(std::unique_ptr<Token>& token) {
+        auto func = MakeNode(NodeKind::ND_FUNCTION);
+        func->name = token->literal;
+        token = std::move(token->next);
+
+        Expect(token, "::");
+        Expect(token, "(");
+        if (!Equal(token.get(), ")")) {
+            do {
+                func->params.push_back(token->literal);
+                token = std::move(token->next);
+                Expect(token, ":");
+                Expect(token, "int");  // For now, only supporting int parameters
+            } while (Equal(token.get(), ",") && (token = std::move(token->next)));
+        }
+        Expect(token, ")");
+
+        func->type = Expect(token, "int")->literal;  // For now, only supporting int return type
+
+        Expect(token, "{");
+        while (!Equal(token.get(), "}")) {
+            func->block.push_back(ParseStatement(token));
+        }
+        Expect(token, "}");
+
+        return func;
+    }
+
+    static std::unique_ptr<Node>
+ParseStatement(std::unique_ptr<Token>& token) {
+        if (Equal(token.get(), "return")) {
+            return ParseReturn(token);
+        } else if (token->kind == TokenKind::TK_IDENTIFIER && token->next->kind == TokenKind::TK_COLON) {
+            return ParseVarDecl(token);
+        } else {
+            auto node = ParseExpression(token);
+            Expect(token, ";");
+            return node;
+        }
+    }
+
+    static std::unique_ptr<Node>
+    ParseReturn(std::unique_ptr<Token>& token) {
+        Expect(token, "return");
+        auto node = MakeUnaryNode(NodeKind::ND_RETURN, ParseExpression(token));
+        Expect(token, ";");
+        return node;
+    }
+
+    static std::unique_ptr<Node>
+    ParseExpression(std::unique_ptr<Token>& token) {
+        auto node = ParseAdditiveExpression(token);
+
+        if (Equal(token.get(), "=")) {
+            token = std::move(token->next);
+            node = MakeBinaryNode(NodeKind::ND_ASSIGN, std::move(node), ParseExpression(token));
+        }
+
+        return node;
+    }
+
     static std::unique_ptr<Node> TreeFromTokens(std::unique_ptr<Token> tokens) {
-        auto tree = ParseAdditiveExpression(tokens);
+        auto tree = ParseProgram(tokens);
         assert(tokens->kind == TokenKind::TK_EOF);
         return tree;
     }
+
+
 };
 
 
