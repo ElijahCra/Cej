@@ -26,18 +26,28 @@ struct StringHash {
 };
 
 enum class NodeKind {
-	ND_ADD,
-	ND_SUB,
-	ND_MUL,
-	ND_DIV,
-	ND_NEG,
-	ND_INT,
-    ND_VAR,
-    ND_ASSIGN,
+    ND_ADD,
+    ND_SUB,
+    ND_MUL,
+    ND_DIV,
+    ND_NEG,
+    ND_INT,
+    ND_FUNC_DECL,
+    ND_VAR_DECL,
     ND_RETURN,
+    ND_IF,
     ND_BLOCK,
     ND_FUNCTION,
-    ND_VARDECL
+    ND_VARDECL,
+    ND_ASSIGN,
+    ND_FUNC_CALL,
+    ND_VAR,
+    ND_LT,
+    ND_PROGRAM,
+    ND_CONST_DECL,    // For constant declarations
+    ND_TYPE_INFERENCE, // For type inference
+    ND_EXPLICIT_TYPE, // For explicit type declarations
+    ND_LATE_ASSIGN,   // For late assignments
 };
 
 struct Node {
@@ -52,7 +62,6 @@ struct Node {
 };
 
 class Parser {
-
     public:
     static std::unordered_map<std::string, int, StringHash, std::equal_to<>> variables;
     static std::unique_ptr<Node>
@@ -82,6 +91,14 @@ class Parser {
         return node;
     }
 
+    /// Helpers
+    static bool IsKeyword(const Token* token, const std::string_view str) {
+        return token->kind == TokenKind::TK_KEYWORD && token->literal == str;
+    }
+
+    static bool IsIdentifier(const Token* token) {
+        return token->kind == TokenKind::TK_IDENTIFIER;
+    }
 
     static bool
     Equal(const Token* token, const std::string_view str) {
@@ -95,6 +112,8 @@ class Parser {
         }
         return std::exchange(token, std::move(token->next));
     }
+
+    /// Helpers
 
     static std::unique_ptr<Node>
     ParseAdditiveExpression(std::unique_ptr<Token>& token) { using enum NodeKind;
@@ -136,8 +155,7 @@ class Parser {
     }
 
     static std::unique_ptr<Node>
-    ParseUnaryExpression(std::unique_ptr<Token>& token) {
-        using enum NodeKind;
+    ParseUnaryExpression(std::unique_ptr<Token>& token) { using enum NodeKind;
         if (Equal(token.get(), "+")) {
             token = std::move(token->next);
             return ParseUnaryExpression(token);

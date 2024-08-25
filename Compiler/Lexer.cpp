@@ -1,9 +1,11 @@
 //
 // Created by Elijah on 8/13/2024.
 //
+
 #ifndef LEXER_CPP
 #define LEXER_CPP
 
+#include <string>
 #include <memory>
 #include <string_view>
 #include <stdexcept>
@@ -14,6 +16,10 @@ enum class TokenKind {
   TK_INT,
   TK_KEYWORD,
   TK_IDENTIFIER,
+  TK_PLUS,
+  TK_MINUS,
+  TK_SLASH,
+  TK_ASTERISK,
   TK_COLON,
   TK_COLONCOLON,
   TK_EQUAL,
@@ -62,7 +68,7 @@ class TokenList {
 };
 
 class Lexer {
-  static constexpr std::array<std::string_view,4> keyWords = { "int", "return", "ret", "main"};
+  static constexpr std::array<std::string_view,3> keyWords = { "int", "return", "ret"};
   public:
 
   static std::unique_ptr<Token>
@@ -74,7 +80,7 @@ class Lexer {
   }
 
   static std::unique_ptr<Token>
-  TokensFromString(std::string_view input) {
+  TokensFromInput(std::string_view input) {
     std::unique_ptr<Token> head = nullptr;
     Token* tail = nullptr;
 
@@ -91,7 +97,6 @@ class Lexer {
         newToken = makeTokenFromText(input);
       } else if (std::ispunct(input.front())) {
         newToken = makeTokenFromPunctuation(input);
-
       } else {
         throw std::runtime_error("Unexpected character: " + std::string(1, input.front()));
       }
@@ -134,7 +139,7 @@ class Lexer {
       input.remove_prefix(1);
     }
     std::string_view text{copy.begin(),input.begin()};
-    if (std::ranges::find(keyWords.begin(),keyWords.end(),text) != keyWords.end()) {
+    if (std::ranges::find(keyWords,text) != keyWords.end()) {
       return MakeToken(TK_KEYWORD,text);
     }
     return MakeToken(TK_IDENTIFIER,text);
@@ -156,6 +161,18 @@ class Lexer {
     }
 
     switch (input.front()) {
+      case '+':
+        input.remove_prefix(1);
+      return MakeToken(TK_PLUS, "+");
+      case '-':
+        input.remove_prefix(1);
+      return MakeToken(TK_MINUS, "-");
+      case '/':
+        input.remove_prefix(1);
+      return MakeToken(TK_SLASH, "/");
+      case '*':
+        input.remove_prefix(1);
+      return MakeToken(TK_ASTERISK, "*");
       case ':':
         input.remove_prefix(1);
       return MakeToken(TK_COLON, ":");

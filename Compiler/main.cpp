@@ -9,8 +9,8 @@ std::unordered_map<std::string, int, StringHash,std::equal_to<>> Parser::variabl
 int
 main()
 {
-    std::string input = "y : int = 4; main :: () int { return y; }";
-    std::unique_ptr<Token> tokens = Lexer::TokensFromString(input);
+    std::string input = "main :: () int { return 4 + 2; }";
+    std::unique_ptr<Token> tokens = Lexer::TokensFromInput(input);
     std::unique_ptr<Node> tree = Parser::TreeFromTokens(std::move(tokens));
     Generator::AssemblyFromTree(std::move(tree));
 
