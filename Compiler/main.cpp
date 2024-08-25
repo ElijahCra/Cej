@@ -1,17 +1,14 @@
 #include <format>
 #include <iostream>
-import Generator;
-import Lexer;
-import Parser;
+#include "Generator.cpp"
 
-/* Driver */
 int
 main()
 {
-    const std::string input = "123 + 456";
-    std::unique_ptr<Token> tokens = Lexer::TokensFromString(input);
-    std::unique_ptr<Node> tree = Parser::TreeFromTokens(std::move(tokens));
-    Generator::AssemblyFromTree(std::move(tree));
+    std::string input = "main :: () int { a=4+2;b=a; return b+a; }";
+    std::unique_ptr<Token> tokens = Lexer::TokensFromInput(input);
+    std::unique_ptr<Program> tree = Parser::Parse(tokens);
+    std::cout<<Generator::GenerateAssembly(tree);
 
     return 0;
 }

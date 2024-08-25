@@ -38,7 +38,7 @@ TEST(LexerTest, ParseIntNumThenSpacesThenAlpha) {
 }
 
 TEST(LexerTest, TokensFromString1) {
-  TokenList tokens = Lexer::TokensFromString("123 + 456");
+  TokenList tokens = Lexer::TokensFromInput("123 + 456");
   auto itr = tokens.begin();
   EXPECT_EQ("123",itr->literal); ++itr;
   EXPECT_EQ("+",itr->literal); ++itr;
@@ -46,7 +46,7 @@ TEST(LexerTest, TokensFromString1) {
 }
 
 TEST(LexerTest, TokensFromString2) {
-  TokenList tokens = Lexer::TokensFromString("123 + 456");
+  TokenList tokens = Lexer::TokensFromInput("123 + 456");
   EXPECT_NO_THROW(  for (const auto& token : tokens) {
     auto toke = token.literal;
   });
@@ -54,7 +54,7 @@ TEST(LexerTest, TokensFromString2) {
 TEST(LexerTest, TokensFromStringMemoryReleased) {
   TokenList::Iterator begin{nullptr};
   {
-    TokenList tokens = Lexer::TokensFromString("123 + 456");
+    TokenList tokens = Lexer::TokensFromInput("123 + 456");
     begin = tokens.begin();
   }
   EXPECT_NE(begin->literal,"123");

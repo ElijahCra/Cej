@@ -1,26 +1,46 @@
 //
 // Created by Elijah on 8/13/2024.
 //
-module;
+
 #ifndef LEXER_CPP
 #define LEXER_CPP
 
+#include <string>
 #include <memory>
 #include <string_view>
-#include <vector>
 #include <stdexcept>
-export module Lexer;
+#include <array>
 
-export enum class TokenKind { TK_EOF, TK_PNT, TK_INT };
+enum class TokenKind {
+  TK_EOF,
+  TK_INT,
+  TK_KEYWORD,
+  TK_IDENTIFIER,
+  TK_PLUS,
+  TK_MINUS,
+  TK_SLASH,
+  TK_ASTERISK,
+  TK_COLON,
+  TK_COLONCOLON,
+  TK_EQUAL,
+  TK_COLONEQUAL,
+  TK_SEMICOLON,
+  TK_OPEN_BRACE,
+  TK_CLOSE_BRACE,
+  TK_OPEN_PAREN,
+  TK_CLOSE_PAREN,
+  TK_COMMA
+};
 
-export struct Token {
-  TokenKind kind;
+struct Token {
+  TokenKind kind{};
   std::string literal;
   std::unique_ptr<Token> next;
 };
 
-export class TokenList {
+class TokenList {
   public:
+
   std::unique_ptr<Token> head;
   explicit TokenList(std::unique_ptr<Token> head) : head(std::move(head)) {}
 
@@ -47,10 +67,12 @@ export class TokenList {
   [[nodiscard]] static Iterator end() { return Iterator(nullptr); }
 };
 
-export class Lexer {
+class Lexer {
+  static constexpr std::array<std::string_view,3> keyWords = { "int", "return", "ret"};
   public:
 
-  static std::unique_ptr<Token> MakeToken(const TokenKind kind, const std::string_view str) {
+  static std::unique_ptr<Token>
+  MakeToken(const TokenKind kind, const std::string_view str) {
     auto token = std::make_unique<Token>();
     token->kind = kind;
     token->literal = std::string(str);
@@ -58,7 +80,7 @@ export class Lexer {
   }
 
   static std::unique_ptr<Token>
-  TokensFromString(std::string_view input) {
+  TokensFromInput(std::string_view input) {
     std::unique_ptr<Token> head = nullptr;
     Token* tail = nullptr;
 
@@ -70,10 +92,11 @@ export class Lexer {
         continue;
       }
       if (std::isdigit(input.front())) {
-        newToken = MakeToken(TokenKind::TK_INT, parseInt(input));
+        newToken = makeTokenFromInt(input);
+      } else if (std::isalpha(input.front())) {
+        newToken = makeTokenFromText(input);
       } else if (std::ispunct(input.front())) {
-        newToken = MakeToken(TokenKind::TK_PNT, std::string{input.front()});
-        input.remove_prefix(1);
+        newToken = makeTokenFromPunctuation(input);
       } else {
         throw std::runtime_error("Unexpected character: " + std::string(1, input.front()));
       }
@@ -96,15 +119,87 @@ export class Lexer {
     return head;
   }
 
-  static std::string parseInt(std::string_view& input) {
+  static std::unique_ptr<Token>
+  makeTokenFromInt(std::string_view& input) { using enum TokenKind;
     const std::string_view copy = input;
+    input.remove_prefix(1);  // Remove the first character (already checked)
     while (!input.empty()  && (std::isdigit(input.front()) || std::isspace(input.front()))) {
       input.remove_prefix(1);
     }
     std::string str(copy.begin(), input.begin());
     std::erase_if(str, isspace);
-    return str;
+    return MakeToken(TK_INT, str);
+  }
 
+  static std::unique_ptr<Token>
+  makeTokenFromText(std::string_view& input) { using enum TokenKind;
+    const std::string_view copy = input;
+    input.remove_prefix(1);  // Remove the first character (already checked)
+    while (!input.empty() && (std::isalnum(input.front()) || input.front() == '_')) {
+      input.remove_prefix(1);
+    }
+    std::string_view text{copy.begin(),input.begin()};
+    if (std::ranges::find(keyWords,text) != keyWords.end()) {
+      return MakeToken(TK_KEYWORD,text);
+    }
+    return MakeToken(TK_IDENTIFIER,text);
+  }
+
+  static std::unique_ptr<Token>
+  makeTokenFromPunctuation(std::string_view& input) {
+    using enum TokenKind;
+
+    if (input.size() >= 2) {
+      if (input.starts_with("::")) {
+        input.remove_prefix(2);
+        return MakeToken(TK_COLONCOLON, "::");
+      }
+      if (input.starts_with(":=")) {
+        input.remove_prefix(2);
+        return MakeToken(TK_COLONEQUAL, ":=");
+      }
+    }
+
+    switch (input.front()) {
+      case '+':
+        input.remove_prefix(1);
+      return MakeToken(TK_PLUS, "+");
+      case '-':
+        input.remove_prefix(1);
+      return MakeToken(TK_MINUS, "-");
+      case '/':
+        input.remove_prefix(1);
+      return MakeToken(TK_SLASH, "/");
+      case '*':
+        input.remove_prefix(1);
+      return MakeToken(TK_ASTERISK, "*");
+      case ':':
+        input.remove_prefix(1);
+      return MakeToken(TK_COLON, ":");
+      case '=':
+        input.remove_prefix(1);
+      return MakeToken(TK_EQUAL, "=");
+      case ';':
+        input.remove_prefix(1);
+      return MakeToken(TK_SEMICOLON, ";");
+      case '{':
+        input.remove_prefix(1);
+      return MakeToken(TK_OPEN_BRACE, "{");
+      case '}':
+        input.remove_prefix(1);
+      return MakeToken(TK_CLOSE_BRACE, "}");
+      case '(':
+        input.remove_prefix(1);
+      return MakeToken(TK_OPEN_PAREN, "(");
+      case ')':
+        input.remove_prefix(1);
+      return MakeToken(TK_CLOSE_PAREN, ")");
+      case ',':
+        input.remove_prefix(1);
+      return MakeToken(TK_COMMA, ",");
+      default:
+        throw std::runtime_error("non valid punctuation in program found in lexer");
+    }
   }
 };
 #endif// LEXER_CPP
