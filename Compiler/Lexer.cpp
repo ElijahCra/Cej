@@ -68,8 +68,8 @@ class TokenList {
 };
 
 class Lexer {
-  static constexpr std::array<std::string_view,3> keyWords = { "int", "return", "ret"};
   public:
+  static constexpr std::array<std::string_view,3> keyWords = {"return", "ret","int"};
 
   static std::unique_ptr<Token>
   MakeToken(const TokenKind kind, const std::string_view str) {
