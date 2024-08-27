@@ -1,3 +1,7 @@
+//
+// Created by Elijah on 8/13/2024.
+//
+
 #ifndef PARSER_CPP
 #define PARSER_CPP
 #include <memory>
@@ -8,11 +12,10 @@
 #include <unordered_map>
 #include "Lexer.cpp"
 
-// Forward declarations
+
 struct Exp;
 struct Statement;
 
-// AST node structures
 struct Program {
     std::unique_ptr<struct Function> function;
     explicit Program(std::unique_ptr<Function> f) : function(std::move(f)) {}
@@ -67,10 +70,10 @@ enum class BinaryOperator { Add, Sub, Mul, Div };
 
 struct BinOp : Exp {
     BinaryOperator op;
-    std::unique_ptr<Exp> left;
-    std::unique_ptr<Exp> right;
+    std::unique_ptr<Exp> lhs;
+    std::unique_ptr<Exp> rhs;
     BinOp(BinaryOperator o, std::unique_ptr<Exp> l, std::unique_ptr<Exp> r)
-        : op(o), left(std::move(l)), right(std::move(r)) {}
+        : op(o), lhs(std::move(l)), rhs(std::move(r)) {}
 };
 
 enum class UnaryOperator { Neg };
