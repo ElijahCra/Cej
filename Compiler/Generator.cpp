@@ -16,18 +16,14 @@ class Generator {
         assembly << line << "\n";
     }
 
-    static std::string CreateLabel() {
-        return ".L" + std::to_string(labelCounter++);
-    }
-
     static void AllocateVariable(const std::string& name) {
         variables[name] = stackSize;
-        stackSize += 4;  // Allocate 4 bytes for each integer variable
+        stackSize += 8;  // Allocate 4 bytes for each integer variable
     }
 
 
     static std::string GetNextRegister() {
-        return "w" + std::to_string(nextRegister++);
+        return "x" + std::to_string(nextRegister++);
     }
 
     static void ResetRegisters() {
@@ -44,9 +40,9 @@ class Generator {
             EmitLine("\tldr " + reg + ", [sp, #" + std::to_string(offset) + "]");
         } else if (auto binOp = dynamic_cast<BinOp*>(exp.get())) {
             GenerateExp(binOp->left);
-            std::string leftReg = "w" + std::to_string(nextRegister - 1);
+            std::string leftReg = "x" + std::to_string(nextRegister - 1);
             GenerateExp(binOp->right);
-            std::string rightReg = "w" + std::to_string(nextRegister - 1);
+            std::string rightReg = "x" + std::to_string(nextRegister - 1);
             std::string resultReg = GetNextRegister();
             switch (binOp->op) {
                 case BinaryOperator::Add:
@@ -64,14 +60,14 @@ class Generator {
             }
         } else if (auto unOp = dynamic_cast<UnOp*>(exp.get())) {
             GenerateExp(unOp->operand);
-            std::string operandReg = "w" + std::to_string(nextRegister - 1);
+            std::string operandReg = "x" + std::to_string(nextRegister - 1);
             std::string resultReg = GetNextRegister();
             if (unOp->op == UnaryOperator::Neg) {
                 EmitLine("\tneg " + resultReg + ", " + operandReg);
             }
         } else if (auto assign = dynamic_cast<Assign*>(exp.get())) {
             GenerateExp(assign->value);
-            std::string valueReg = "w" + std::to_string(nextRegister - 1);
+            std::string valueReg = "x" + std::to_string(nextRegister - 1);
             int offset = variables[assign->name];
             EmitLine("\tstr " + valueReg + ", [sp, #" + std::to_string(offset) + "]");
         }
@@ -81,13 +77,11 @@ class Generator {
         ResetRegisters();
         if (auto returnStmt = dynamic_cast<Return*>(stmt.get())) {
             GenerateExp(returnStmt->expression);
-            EmitLine("\tmov w0, w" + std::to_string(nextRegister - 1));
-            EmitLine("\tb .Lreturn");
         } else if (auto declareStmt = dynamic_cast<Declare*>(stmt.get())) {
             AllocateVariable(declareStmt->name);
             if (declareStmt->initializer) {
                 GenerateExp(*declareStmt->initializer);
-                std::string valueReg = "w" + std::to_string(nextRegister - 1);
+                std::string valueReg = "x" + std::to_string(nextRegister - 1);
                 int offset = variables[declareStmt->name];
                 EmitLine("\tstr " + valueReg + ", [sp, #" + std::to_string(offset) + "]");
             }
@@ -109,8 +103,11 @@ class Generator {
         EmitLine("\tstp x29, x30, [sp, #-16]!");
         EmitLine("\tmov x29, sp");
 
+        if (func->allocationSize % 16 != 0) {
+            func->allocationSize += 8;
+        }
         //Allocate variable space
-        EmitLine("\t sub sp, sp, #" + std::to_string(func->allocationSize));
+        EmitLine("\tsub sp, sp, #" + std::to_string(func->allocationSize));
 
         // Generate code for each statement
         for (const auto& stmt : func->statements) {
@@ -123,17 +120,14 @@ class Generator {
         }
 
         // Allocate stack space for local variables
-        if (stackSize > 0) {
-            EmitLine("\tsub sp, sp, #" + std::to_string(stackSize));
+        if (func->allocationSize > 0) {
+            EmitLine("\tadd sp, sp, #" + std::to_string(func->allocationSize));
         }
 
         // Epilogue
-        EmitLine(".Lreturn:");
-        if (stackSize > 0) {
-            EmitLine("\tadd sp, sp, #" + std::to_string(stackSize));
-        }
         EmitLine("\tldp x29, x30, [sp], #16");
-        EmitLine("\tret");
+        EmitLine("\tmov x16, #1");
+        EmitLine("\tsvc #0x80");
     }
 
 public:

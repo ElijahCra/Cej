@@ -15,7 +15,7 @@ struct Statement;
 // AST node structures
 struct Program {
     std::unique_ptr<struct Function> function;
-    explicit Program(std::unique_ptr<struct Function> f) : function(std::move(f)) {}
+    explicit Program(std::unique_ptr<Function> f) : function(std::move(f)) {}
 };
 
 struct Function {
@@ -94,7 +94,7 @@ public:
 
 private:
     static constexpr std::array<std::string_view,1> systemTypes = {"int"};
-    static constexpr std::array<std::pair<std::string,int>,1> typeSizes {std::pair("int",16)};
+    static constexpr std::array<std::pair<std::string,int>,1> typeSizes {std::pair("int",8)};
 
     static std::unique_ptr<Program> ParseProgram(std::unique_ptr<Token>& token) {
         auto function = ParseFunction(token);
