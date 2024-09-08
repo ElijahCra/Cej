@@ -16,47 +16,44 @@ class Generator {
     inline static int labelCounter;
 
     static void EmitLine(const std::string& line) {
-        assembly << line << "\n";
+        std::cout << line << "\n";
     }
 
     static void AllocateVariable(const std::string& name) {
-        variables[name] = stackSize;
         stackSize += 8;
+        variables[name] = -stackSize;
     }
 
     static void GenerateExp(const std::unique_ptr<Exp>& exp) {
         if (auto constant = dynamic_cast<Constant*>(exp.get())) {
             EmitLine("\tmov x0, #" + std::to_string(constant->value));
-        } else if (auto var = dynamic_cast<Var*>(exp.get())) {
+            return;
+        }
+        if (auto var = dynamic_cast<Var*>(exp.get())) {
             int offset = variables[var->name];
-            EmitLine("\tldr x0, [sp, #" + std::to_string(offset) + "]");
-        } else if (auto binOp = dynamic_cast<BinOp*>(exp.get())) {
-            // Generate code for the right-hand side
+            EmitLine("\tldr x0, [x29, #" + std::to_string(offset) + "]");
+            return;
+        }
+        if (auto binOp = dynamic_cast<BinOp*>(exp.get())) {
             GenerateExp(binOp->rhs);
-            // Store the result on the stack
             EmitLine("\tstr x0, [sp, #-16]!");
 
-            // Generate code for the left-hand side
             GenerateExp(binOp->lhs);
-            // Move the left-hand side result to x1
-            EmitLine("\tmov x1, x0");
-
-            // Load the right-hand side result from the stack
-            EmitLine("\tldr x0, [sp], #16");
+            EmitLine("\tldr x1, [sp], #16");
 
             // Perform the operation
             switch (binOp->op) {
                 case BinaryOperator::Add:
-                    EmitLine("\tadd x0, x1, x0");
+                    EmitLine("\tadd x0, x0, x1");
                     break;
                 case BinaryOperator::Sub:
-                    EmitLine("\tsub x0, x1, x0");
+                    EmitLine("\tsub x0, x0, x1");
                     break;
                 case BinaryOperator::Mul:
-                    EmitLine("\tmul x0, x1, x0");
+                    EmitLine("\tmul x0, x0, x1");
                     break;
                 case BinaryOperator::Div:
-                    EmitLine("\tsdiv x0, x1, x0");
+                    EmitLine("\tsdiv x0, x0, x1");
                     break;
             }
         } else if (auto unOp = dynamic_cast<UnOp*>(exp.get())) {
@@ -67,7 +64,7 @@ class Generator {
         } else if (auto assign = dynamic_cast<Assign*>(exp.get())) {
             GenerateExp(assign->value);
             int offset = variables[assign->name];
-            EmitLine("\tstr x0, [sp, #" + std::to_string(offset) + "]");
+            EmitLine("\tstr x0, [x29, #" + std::to_string(offset) + "]");
         }
     }
 
@@ -79,13 +76,12 @@ class Generator {
             if (declareStmt->initializer) {
                 GenerateExp(*declareStmt->initializer);
                 int offset = variables[declareStmt->name];
-                EmitLine("\tstr x0, [sp, #" + std::to_string(offset) + "]");
+                EmitLine("\tstr x0, [x29, #" + std::to_string(offset) + "]");
             }
         } else if (auto expStmt = dynamic_cast<ExpStatement*>(stmt.get())) {
             GenerateExp(expStmt->expression);
         }
     }
-
 
     static void GenerateFunction(const std::unique_ptr<Function>& func) {
         variables.clear();
@@ -115,9 +111,7 @@ class Generator {
         }
 
         // Epilogue
-        if (totalStackSize > 0) {
-            EmitLine("\tadd sp, sp, #" + std::to_string(totalStackSize));
-        }
+        EmitLine("\tmov sp, x29");
         EmitLine("\tldp x29, x30, [sp], #16");
         EmitLine("\tmov x16, #1");
         EmitLine("\tsvc #0x80");
