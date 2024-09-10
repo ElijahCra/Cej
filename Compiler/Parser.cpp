@@ -15,10 +15,11 @@
 
 struct Exp;
 struct Statement;
+struct Function;
 
 struct Program {
-    std::unique_ptr<struct Function> function;
-    explicit Program(std::unique_ptr<Function> f) : function(std::move(f)) {}
+    std::vector<std::unique_ptr<Function>> functions;
+    explicit Program(std::vector<std::unique_ptr<Function>> f) : functions(std::move(f)) {}
 };
 
 struct Function {
@@ -66,6 +67,13 @@ struct Var : Exp {
     explicit Var(std::string n) : name(std::move(n)) {}
 };
 
+struct FunctionCall : Exp {
+    std::string name;
+    std::vector<std::unique_ptr<Exp>> arguments;
+    FunctionCall(std::string n, std::vector<std::unique_ptr<Exp>> args)
+        : name(std::move(n)), arguments(std::move(args)) {}
+};
+
 enum class BinaryOperator { Add, Sub, Mul, Div };
 
 struct BinOp : Exp {
@@ -90,18 +98,21 @@ struct Constant : Exp {
 };
 
 class Parser {
-public:
+    public:
     static std::unique_ptr<Program> Parse(std::unique_ptr<Token>& token) {
         return ParseProgram(token);
     }
 
-private:
+    private:
     static constexpr std::array<std::string_view,1> systemTypes = {"int"};
     static constexpr std::array<std::pair<std::string,int>,1> typeSizes {std::pair("int",8)};
 
     static std::unique_ptr<Program> ParseProgram(std::unique_ptr<Token>& token) {
-        auto function = ParseFunction(token);
-        return std::make_unique<Program>(std::move(function));
+        std::vector<std::unique_ptr<Function>> functions;
+        while (token->kind != TokenKind::TK_EOF) {
+            functions.push_back(ParseFunction(token));
+        }
+        return std::make_unique<Program>(std::move(functions));
     }
 
     static std::unique_ptr<Function> ParseFunction(std::unique_ptr<Token>& token) {
@@ -120,7 +131,7 @@ private:
             auto statement = ParseStatement(token);
             if (auto declare = dynamic_cast<Declare*>(statement.get())) {
                 if (declare->type == "int") {
-                    allocationSize+=std::ranges::find(typeSizes,declare->type,&std::pair<std::string,int>::first)->second;
+                    allocationSize += std::ranges::find(typeSizes, declare->type, &std::pair<std::string,int>::first)->second;
                 }
             }
             statements.push_back(std::move(statement));
@@ -220,6 +231,9 @@ private:
         } else if (token->kind == TokenKind::TK_IDENTIFIER) {
             std::string name = token->literal;
             token = std::move(token->next);
+            if (Equal(token.get(), "(")) {
+                return ParseFunctionCall(name, token);
+            }
             return std::make_unique<Var>(std::move(name));
         } else if (Equal(token.get(), "(")) {
             token = std::move(token->next);
@@ -229,6 +243,18 @@ private:
         } else {
             throw std::runtime_error("Unexpected token in primary expression");
         }
+    }
+
+    static std::unique_ptr<Exp> ParseFunctionCall(const std::string& name, std::unique_ptr<Token>& token) {
+        Expect(token, "(");
+        std::vector<std::unique_ptr<Exp>> arguments;
+        if (!Equal(token.get(), ")")) {
+            do {
+                arguments.push_back(ParseExpression(token));
+            } while (Equal(token.get(), ",") && (token = std::move(token->next)));
+        }
+        Expect(token, ")");
+        return std::make_unique<FunctionCall>(name, std::move(arguments));
     }
 
     static bool Equal(const Token* token, const std::string_view str) {
