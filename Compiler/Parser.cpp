@@ -105,7 +105,7 @@ class Parser {
 
     private:
     static constexpr std::array<std::string_view,1> systemTypes = {"int"};
-    static constexpr std::array<std::pair<std::string,int>,1> typeSizes {std::pair("int",8)};
+    static constexpr std::array<std::pair<std::string,int>,1> typeSizes {std::pair("int",16)};
 
     static std::unique_ptr<Program> ParseProgram(std::unique_ptr<Token>& token) {
         std::vector<std::unique_ptr<Function>> functions;

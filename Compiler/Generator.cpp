@@ -21,7 +21,7 @@ class Generator {
     }
 
     static void AllocateVariable(const std::string& name) {
-        stackSize += 8;
+        stackSize += 16;  // Ensure 16-byte alignment
         functionVariables[currentFunction][name] = -stackSize;
     }
 
@@ -60,7 +60,10 @@ class Generator {
             int offset = functionVariables[currentFunction][assign->name];
             EmitLine("\tstr x0, [x29, #" + std::to_string(offset) + "]");
         } else if (auto funcCall = dynamic_cast<FunctionCall*>(exp.get())) {
-            // Generate code for function arguments
+            // Align stack before function call
+            if (funcCall->arguments.size() % 2 != 0) {
+                EmitLine("\tsub sp, sp, #16");
+            }
             for (const auto& arg : funcCall->arguments) {
                 GenerateExp(arg);
                 EmitLine("\tstr x0, [sp, #-16]!");
@@ -91,19 +94,16 @@ class Generator {
 
         bool isMainFunction = (func->name == "main");
 
-
         EmitLine("_" + func->name + ":");
 
         // Prologue
         EmitLine("\tstp x29, x30, [sp, #-16]!");
         EmitLine("\tmov x29, sp");
 
-        int totalStackSize = func->allocationSize;
-        if (totalStackSize % 16 != 0) {
-            totalStackSize += 16 - (totalStackSize % 16);
-        }
-        if (totalStackSize > 0) {
-            EmitLine("\tsub sp, sp, #" + std::to_string(totalStackSize));
+        // Ensure 16-byte stack alignment
+        int totalStackSize = ((func->allocationSize + 15) & ~15) + 16;  // Round up to nearest multiple of 16, plus 16 for saved registers
+        if (totalStackSize > 16) {
+            EmitLine("\tsub sp, sp, #" + std::to_string(totalStackSize - 16));
         }
 
         for (const auto& stmt : func->statements) {
@@ -111,12 +111,16 @@ class Generator {
         }
 
         // Epilogue
-        EmitLine("\tmov sp, x29");
+        if (totalStackSize > 16) {
+            EmitLine("\tadd sp, sp, #" + std::to_string(totalStackSize - 16));
+        }
         EmitLine("\tldp x29, x30, [sp], #16");
 
         if (isMainFunction) {
             EmitLine("\tmov x16, #1");
             EmitLine("\tsvc #0x80");
+        } else {
+            EmitLine("\tret");
         }
     }
 
