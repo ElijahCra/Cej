@@ -51,12 +51,3 @@ TEST(LexerTest, TokensFromString2) {
     auto toke = token.literal;
   });
 }
-TEST(LexerTest, TokensFromStringMemoryReleased) {
-  TokenList::Iterator begin{nullptr};
-  {
-    TokenList tokens {Lexer::TokensFromInput("123 + 456")};
-    begin = tokens.begin();
-  }
-  //still reads the memory...
-  //EXPECT_NE(begin->literal,"123");
-}

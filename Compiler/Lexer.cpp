@@ -122,7 +122,7 @@ class Lexer {
   static std::unique_ptr<Token>
   makeTokenFromInt(std::string_view& input) { using enum TokenKind;
     const std::string_view copy = input;
-    input.remove_prefix(1);  // Remove the first character (already checked)
+    input.remove_prefix(1);
     while (!input.empty()  && (std::isdigit(input.front()) || std::isspace(input.front()))) {
       input.remove_prefix(1);
     }
@@ -134,7 +134,7 @@ class Lexer {
   static std::unique_ptr<Token>
   makeTokenFromText(std::string_view& input) { using enum TokenKind;
     const std::string_view copy = input;
-    input.remove_prefix(1);  // Remove the first character (already checked)
+    input.remove_prefix(1);
     while (!input.empty() && (std::isalnum(input.front()) || input.front() == '_')) {
       input.remove_prefix(1);
     }
