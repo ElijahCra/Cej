@@ -99,7 +99,8 @@ struct Constant : Exp {
 
 class Parser {
     public:
-    static std::unique_ptr<Program> Parse(std::unique_ptr<Token>& token) {
+    static std::unique_ptr<Program>
+    Parse(std::unique_ptr<Token>& token) {
         return ParseProgram(token);
     }
 
@@ -107,7 +108,8 @@ class Parser {
     static constexpr std::array<std::string_view,1> systemTypes = {"int"};
     static constexpr std::array<std::pair<std::string,int>,1> typeSizes {std::pair("int",16)};
 
-    static std::unique_ptr<Program> ParseProgram(std::unique_ptr<Token>& token) {
+    static std::unique_ptr<Program>
+    ParseProgram(std::unique_ptr<Token>& token) {
         std::vector<std::unique_ptr<Function>> functions;
         while (token->kind != TokenKind::TK_EOF) {
             functions.push_back(ParseFunction(token));
@@ -115,7 +117,8 @@ class Parser {
         return std::make_unique<Program>(std::move(functions));
     }
 
-    static std::unique_ptr<Function> ParseFunction(std::unique_ptr<Token>& token) {
+    static std::unique_ptr<Function>
+    ParseFunction(std::unique_ptr<Token>& token) {
         std::string name = token->literal;
         token = std::move(token->next);
 
@@ -141,7 +144,8 @@ class Parser {
         return std::make_unique<Function>(std::move(name), allocationSize, std::move(statements));
     }
 
-    static std::unique_ptr<Statement> ParseStatement(std::unique_ptr<Token>& token) {
+    static std::unique_ptr<Statement>
+    ParseStatement(std::unique_ptr<Token>& token) {
         if (Equal(token.get(), "return")) {
             token = std::move(token->next);
             auto exp = ParseExpression(token);
@@ -183,11 +187,13 @@ class Parser {
         throw std::runtime_error("Unexpected statement");
     }
 
-    static std::unique_ptr<Exp> ParseExpression(std::unique_ptr<Token>& token) {
+    static std::unique_ptr<Exp>
+    ParseExpression(std::unique_ptr<Token>& token) {
         return ParseAdditiveExpression(token);
     }
 
-    static std::unique_ptr<Exp> ParseAdditiveExpression(std::unique_ptr<Token>& token) {
+    static std::unique_ptr<Exp>
+    ParseAdditiveExpression(std::unique_ptr<Token>& token) {
         auto left = ParseMultiplicativeExpression(token);
 
         while (Equal(token.get(), "+") || Equal(token.get(), "-")) {
@@ -200,7 +206,8 @@ class Parser {
         return left;
     }
 
-    static std::unique_ptr<Exp> ParseMultiplicativeExpression(std::unique_ptr<Token>& token) {
+    static std::unique_ptr<Exp>
+    ParseMultiplicativeExpression(std::unique_ptr<Token>& token) {
         auto left = ParseUnaryExpression(token);
 
         while (Equal(token.get(), "*") || Equal(token.get(), "/")) {
@@ -213,17 +220,18 @@ class Parser {
         return left;
     }
 
-    static std::unique_ptr<Exp> ParseUnaryExpression(std::unique_ptr<Token>& token) {
+    static std::unique_ptr<Exp>
+    ParseUnaryExpression(std::unique_ptr<Token>& token) {
         if (Equal(token.get(), "-")) {
             token = std::move(token->next);
             auto operand = ParseUnaryExpression(token);
             return std::make_unique<UnOp>(UnaryOperator::Neg, std::move(operand));
-        } else {
-            return ParsePrimaryExpression(token);
         }
+        return ParsePrimaryExpression(token);
     }
 
-    static std::unique_ptr<Exp> ParsePrimaryExpression(std::unique_ptr<Token>& token) {
+    static std::unique_ptr<Exp>
+    ParsePrimaryExpression(std::unique_ptr<Token>& token) {
         if (token->kind == TokenKind::TK_INT) {
             int value = std::stoi(token->literal);
             token = std::move(token->next);
@@ -245,7 +253,8 @@ class Parser {
         }
     }
 
-    static std::unique_ptr<Exp> ParseFunctionCall(const std::string& name, std::unique_ptr<Token>& token) {
+    static std::unique_ptr<Exp>
+    ParseFunctionCall(const std::string& name, std::unique_ptr<Token>& token) {
         Expect(token, "(");
         std::vector<std::unique_ptr<Exp>> arguments;
         if (!Equal(token.get(), ")")) {
@@ -257,11 +266,13 @@ class Parser {
         return std::make_unique<FunctionCall>(name, std::move(arguments));
     }
 
-    static bool Equal(const Token* token, const std::string_view str) {
+    static bool
+    Equal(const Token* token, const std::string_view str) {
         return token->literal == str;
     }
 
-    static std::unique_ptr<Token> Expect(std::unique_ptr<Token>& token, const std::string_view expected) {
+    static std::unique_ptr<Token>
+    Expect(std::unique_ptr<Token>& token, const std::string_view expected) {
         if (!Equal(token.get(), expected)) {
             throw std::runtime_error("Expected '" + std::string(expected) + "', but got '" + token->literal + "'");
         }

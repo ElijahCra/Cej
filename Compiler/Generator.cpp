@@ -16,16 +16,19 @@ class Generator {
     inline static int labelCounter;
     inline static std::string currentFunction;
 
-    static void EmitLine(const std::string& line) {
+    static void
+    EmitLine(const std::string& line) {
         std::cout << line << "\n";
     }
 
-    static void AllocateVariable(const std::string& name) {
-        stackSize += 16;  // Ensure 16-byte alignment
+    static void
+    AllocateVariable(const std::string& name) {
+        stackSize += 16;
         functionVariables[currentFunction][name] = -stackSize;
     }
 
-    static void GenerateExp(const std::unique_ptr<Exp>& exp) {
+    static void
+    GenerateExp(const std::unique_ptr<Exp>& exp) {
         if (auto constant = dynamic_cast<Constant*>(exp.get())) {
             EmitLine("\tmov x0, #" + std::to_string(constant->value));
         } else if (auto var = dynamic_cast<Var*>(exp.get())) {
@@ -60,7 +63,6 @@ class Generator {
             int offset = functionVariables[currentFunction][assign->name];
             EmitLine("\tstr x0, [x29, #" + std::to_string(offset) + "]");
         } else if (auto funcCall = dynamic_cast<FunctionCall*>(exp.get())) {
-            // Align stack before function call
             if (funcCall->arguments.size() % 2 != 0) {
                 EmitLine("\tsub sp, sp, #16");
             }
@@ -72,7 +74,8 @@ class Generator {
         }
     }
 
-    static void GenerateStatement(const std::unique_ptr<Statement>& stmt) {
+    static void
+    GenerateStatement(const std::unique_ptr<Statement>& stmt) {
         if (auto returnStmt = dynamic_cast<Return*>(stmt.get())) {
             GenerateExp(returnStmt->expression);
         } else if (auto declareStmt = dynamic_cast<Declare*>(stmt.get())) {
@@ -87,7 +90,8 @@ class Generator {
         }
     }
 
-    static void GenerateFunction(const std::unique_ptr<Function>& func) {
+    static void
+    GenerateFunction(const std::unique_ptr<Function>& func) {
         currentFunction = func->name;
         functionVariables[currentFunction].clear();
         stackSize = 0;
@@ -96,12 +100,10 @@ class Generator {
 
         EmitLine("_" + func->name + ":");
 
-        // Prologue
         EmitLine("\tstp x29, x30, [sp, #-16]!");
         EmitLine("\tmov x29, sp");
 
-        // Ensure 16-byte stack alignment
-        int totalStackSize = ((func->allocationSize + 15) & ~15) + 16;  // Round up to nearest multiple of 16, plus 16 for saved registers
+        int totalStackSize = ((func->allocationSize + 15) & ~15) + 16;
         if (totalStackSize > 16) {
             EmitLine("\tsub sp, sp, #" + std::to_string(totalStackSize - 16));
         }
@@ -110,7 +112,6 @@ class Generator {
             GenerateStatement(stmt);
         }
 
-        // Epilogue
         if (totalStackSize > 16) {
             EmitLine("\tadd sp, sp, #" + std::to_string(totalStackSize - 16));
         }
@@ -125,7 +126,8 @@ class Generator {
     }
 
 public:
-    static std::string GenerateAssembly(const std::unique_ptr<Program>& program) {
+    static std::string
+    GenerateAssembly(const std::unique_ptr<Program>& program) {
         assembly.str("");
         assembly.clear();
         EmitLine("\t.globl _main");
@@ -134,7 +136,6 @@ public:
         for (const auto& func : program->functions) {
             GenerateFunction(func);
         }
-
         return assembly.str();
     }
 };
