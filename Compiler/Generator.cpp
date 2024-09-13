@@ -28,38 +28,61 @@ class Generator {
     }
 
     static void
-    GenerateExp(const std::unique_ptr<Exp>& exp) {
+    GenerateExp(const std::unique_ptr<Exp>& exp, bool needResult = true, int depth = 0) {
         if (auto constant = dynamic_cast<Constant*>(exp.get())) {
-            EmitLine("\tmov x0, #" + std::to_string(constant->value));
+            if (needResult) {
+                EmitLine("\tmov x0, #" + std::to_string(constant->value));
+            }
         } else if (auto var = dynamic_cast<Var*>(exp.get())) {
-            int offset = functionVariables[currentFunction][var->name];
-            EmitLine("\tldr x0, [x29, #" + std::to_string(offset) + "]");
+            if (needResult) {
+                int offset = functionVariables[currentFunction][var->name];
+                EmitLine("\tldr x0, [x29, #" + std::to_string(offset) + "]");
+            }
         } else if (auto binOp = dynamic_cast<BinOp*>(exp.get())) {
-            GenerateExp(binOp->rhs);
-            EmitLine("\tstr x0, [sp, #-16]!");
-            GenerateExp(binOp->lhs);
-            EmitLine("\tldr x1, [sp], #16");
+            bool isSimpleOperation = IsSimpleExpression(binOp->lhs) && IsSimpleExpression(binOp->rhs);
+
+            if (!isSimpleOperation) {
+                GenerateExp(binOp->rhs, true, depth + 1);
+                if (depth > 0) {
+                    EmitLine("\tstr x0, [sp, #-16]!");
+                }
+            }
+
+            GenerateExp(binOp->lhs, true, depth + 1);
+
+            if (!isSimpleOperation) {
+                if (depth > 0) {
+                    EmitLine("\tldr x1, [sp], #16");
+                } else {
+                    EmitLine("\tmov x1, x0");
+                    GenerateExp(binOp->rhs, true, depth + 1);
+                }
+            } else {
+                EmitLine("\tmov x1, x0");
+                GenerateExp(binOp->rhs, true, depth + 1);
+            }
+
             switch (binOp->op) {
                 case BinaryOperator::Add:
                     EmitLine("\tadd x0, x0, x1");
                     break;
                 case BinaryOperator::Sub:
-                    EmitLine("\tsub x0, x0, x1");
+                    EmitLine("\tsub x0, x1, x0");
                     break;
                 case BinaryOperator::Mul:
                     EmitLine("\tmul x0, x0, x1");
                     break;
                 case BinaryOperator::Div:
-                    EmitLine("\tsdiv x0, x0, x1");
+                    EmitLine("\tsdiv x0, x1, x0");
                     break;
             }
         } else if (auto unOp = dynamic_cast<UnOp*>(exp.get())) {
-            GenerateExp(unOp->operand);
+            GenerateExp(unOp->operand, true, depth);
             if (unOp->op == UnaryOperator::Neg) {
                 EmitLine("\tneg x0, x0");
             }
         } else if (auto assign = dynamic_cast<Assign*>(exp.get())) {
-            GenerateExp(assign->value);
+            GenerateExp(assign->value, true, depth);
             int offset = functionVariables[currentFunction][assign->name];
             EmitLine("\tstr x0, [x29, #" + std::to_string(offset) + "]");
         } else if (auto funcCall = dynamic_cast<FunctionCall*>(exp.get())) {
@@ -67,11 +90,16 @@ class Generator {
                 EmitLine("\tsub sp, sp, #16");
             }
             for (const auto& arg : funcCall->arguments) {
-                GenerateExp(arg);
+                GenerateExp(arg, true, depth + 1);
                 EmitLine("\tstr x0, [sp, #-16]!");
             }
             EmitLine("\tbl _" + funcCall->name);
         }
+    }
+
+    static bool IsSimpleExpression(const std::unique_ptr<Exp>& exp) {
+        return dynamic_cast<Constant*>(exp.get()) != nullptr ||
+               dynamic_cast<Var*>(exp.get()) != nullptr;
     }
 
     static void
