@@ -35,23 +35,57 @@ class Generator {
             int offset = functionVariables[currentFunction][var->name];
             EmitLine("\tldr x0, [x29, #" + std::to_string(offset) + "]");
         } else if (auto binOp = dynamic_cast<BinOp*>(exp.get())) {
-            GenerateExp(binOp->rhs);
-            EmitLine("\tstr x0, [sp, #-16]!");
-            GenerateExp(binOp->lhs);
-            EmitLine("\tldr x1, [sp], #16");
-            switch (binOp->op) {
-                case BinaryOperator::Add:
-                    EmitLine("\tadd x0, x0, x1");
+            bool lhsSimple = dynamic_cast<Var*>(binOp->lhs.get()) || dynamic_cast<Constant*>(binOp->lhs.get());
+            bool rhsSimple = dynamic_cast<Var*>(binOp->rhs.get()) || dynamic_cast<Constant*>(binOp->rhs.get());
+
+            if (lhsSimple && rhsSimple) {
+                if (auto rhsVar = dynamic_cast<Var*>(binOp->rhs.get())) {
+                    int offset = functionVariables[currentFunction][rhsVar->name];
+                    EmitLine("\tldr x0, [x29, #" + std::to_string(offset) + "]");
+                } else if (auto rhsConst = dynamic_cast<Constant*>(binOp->rhs.get())) {
+                    EmitLine("\tmov x0, #" + std::to_string(rhsConst->value));
+                }
+
+                if (auto lhsVar = dynamic_cast<Var*>(binOp->lhs.get())) {
+                    int offset = functionVariables[currentFunction][lhsVar->name];
+                    EmitLine("\tldr x1, [x29, #" + std::to_string(offset) + "]");
+                } else if (auto lhsConst = dynamic_cast<Constant*>(binOp->lhs.get())) {
+                    EmitLine("\tmov x1, #" + std::to_string(lhsConst->value));
+                }
+
+                switch (binOp->op) {
+                    case BinaryOperator::Add:
+                        EmitLine("\tadd x0, x0, x1");
+                        break;
+                    case BinaryOperator::Sub:
+                        EmitLine("\tsub x0, x0, x1");
+                        break;
+                    case BinaryOperator::Mul:
+                        EmitLine("\tmul x0, x0, x1");
+                        break;
+                    case BinaryOperator::Div:
+                        EmitLine("\tsdiv x0, x0, x1");
+                        break;
+                }
+            } else {
+                GenerateExp(binOp->rhs);
+                EmitLine("\tstr x0, [sp, #-16]!");
+                GenerateExp(binOp->lhs);
+                EmitLine("\tldr x1, [sp], #16");
+                switch (binOp->op) {
+                    case BinaryOperator::Add:
+                        EmitLine("\tadd x0, x0, x1");
                     break;
-                case BinaryOperator::Sub:
-                    EmitLine("\tsub x0, x0, x1");
+                    case BinaryOperator::Sub:
+                        EmitLine("\tsub x0, x0, x1");
                     break;
-                case BinaryOperator::Mul:
-                    EmitLine("\tmul x0, x0, x1");
+                    case BinaryOperator::Mul:
+                        EmitLine("\tmul x0, x0, x1");
                     break;
-                case BinaryOperator::Div:
-                    EmitLine("\tsdiv x0, x0, x1");
+                    case BinaryOperator::Div:
+                        EmitLine("\tsdiv x0, x0, x1");
                     break;
+                }
             }
         } else if (auto unOp = dynamic_cast<UnOp*>(exp.get())) {
             GenerateExp(unOp->operand);
