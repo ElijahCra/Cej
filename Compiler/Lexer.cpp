@@ -34,7 +34,7 @@ enum class TokenKind {
 
 struct Token {
   TokenKind kind{};
-  std::string literal;
+  std::string raw_val;
   std::unique_ptr<Token> next;
 };
 
@@ -75,7 +75,7 @@ class Lexer {
   MakeToken(const TokenKind kind, const std::string_view str) {
     auto token = std::make_unique<Token>();
     token->kind = kind;
-    token->literal = std::string(str);
+    token->raw_val = std::string(str);
     return token;
   }
 

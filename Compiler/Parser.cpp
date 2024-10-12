@@ -92,9 +92,9 @@ struct UnOp : Exp {
     UnOp(UnaryOperator o, std::unique_ptr<Exp> e) : op(o), operand(std::move(e)) {}
 };
 
-struct Constant : Exp {
+struct Literal : Exp {
     int value;
-    explicit Constant(int v) : value(v) {}
+    explicit Literal(int v) : value(v) {}
 };
 
 class Parser {
@@ -119,7 +119,7 @@ class Parser {
 
     static std::unique_ptr<Function>
     ParseFunction(std::unique_ptr<Token>& token) {
-        std::string name = token->literal;
+        std::string name = token->raw_val;
         token = std::move(token->next);
 
         Expect(token, "::");
@@ -153,15 +153,15 @@ class Parser {
             return std::make_unique<Return>(std::move(exp));
         }
         if (token->kind == TokenKind::TK_IDENTIFIER) {
-            std::string name = token->literal;
+            std::string name = token->raw_val;
             token = std::move(token->next);
 
             if (Equal(token.get(), ":")) {
                 token = std::move(token->next);
-                if (std::ranges::find(systemTypes,token->literal) == systemTypes.end()) {
+                if (std::ranges::find(systemTypes,token->raw_val) == systemTypes.end()) {
                     throw std::runtime_error("Provided type not in system types");
                 }
-                std::string type = token->literal;
+                std::string type = token->raw_val;
                 token = std::move(token->next);
 
                 if (Equal(token.get(), "=")) {
@@ -233,24 +233,25 @@ class Parser {
     static std::unique_ptr<Exp>
     ParsePrimaryExpression(std::unique_ptr<Token>& token) {
         if (token->kind == TokenKind::TK_INT) {
-            int value = std::stoi(token->literal);
+            int value = std::stoi(token->raw_val);
             token = std::move(token->next);
-            return std::make_unique<Constant>(value);
-        } else if (token->kind == TokenKind::TK_IDENTIFIER) {
-            std::string name = token->literal;
+            return std::make_unique<Literal>(value);
+        }
+        if (token->kind == TokenKind::TK_IDENTIFIER) {
+            std::string name = token->raw_val;
             token = std::move(token->next);
             if (Equal(token.get(), "(")) {
                 return ParseFunctionCall(name, token);
             }
             return std::make_unique<Var>(std::move(name));
-        } else if (Equal(token.get(), "(")) {
+        }
+        if (Equal(token.get(), "(")) {
             token = std::move(token->next);
             auto exp = ParseExpression(token);
             Expect(token, ")");
             return exp;
-        } else {
-            throw std::runtime_error("Unexpected token in primary expression");
         }
+        throw std::runtime_error("Unexpected token in primary expression");
     }
 
     static std::unique_ptr<Exp>
@@ -268,13 +269,13 @@ class Parser {
 
     static bool
     Equal(const Token* token, const std::string_view str) {
-        return token->literal == str;
+        return token->raw_val == str;
     }
 
     static std::unique_ptr<Token>
     Expect(std::unique_ptr<Token>& token, const std::string_view expected) {
         if (!Equal(token.get(), expected)) {
-            throw std::runtime_error("Expected '" + std::string(expected) + "', but got '" + token->literal + "'");
+            throw std::runtime_error("Expected '" + std::string(expected) + "', but got '" + token->raw_val + "'");
         }
         return std::exchange(token, std::move(token->next));
     }

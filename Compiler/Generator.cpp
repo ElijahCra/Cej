@@ -29,44 +29,44 @@ class Generator {
 
     static void
     GenerateExp(const std::unique_ptr<Exp>& exp) {
-        if (auto constant = dynamic_cast<Constant*>(exp.get())) {
-            EmitLine("\tmov x0, #" + std::to_string(constant->value));
+        if (auto literal = dynamic_cast<Literal*>(exp.get())) {
+            EmitLine("\tmov x0, #" + std::to_string(literal->value));
         } else if (auto var = dynamic_cast<Var*>(exp.get())) {
             int offset = functionVariables[currentFunction][var->name];
             EmitLine("\tldr x0, [x29, #" + std::to_string(offset) + "]");
         } else if (auto binOp = dynamic_cast<BinOp*>(exp.get())) {
-            bool lhsSimple = dynamic_cast<Var*>(binOp->lhs.get()) || dynamic_cast<Constant*>(binOp->lhs.get());
-            bool rhsSimple = dynamic_cast<Var*>(binOp->rhs.get()) || dynamic_cast<Constant*>(binOp->rhs.get());
+            bool lhsSimple = dynamic_cast<Var*>(binOp->lhs.get()) || dynamic_cast<Literal*>(binOp->lhs.get());
+            bool rhsSimple = dynamic_cast<Var*>(binOp->rhs.get()) || dynamic_cast<Literal*>(binOp->rhs.get());
 
             if (lhsSimple && rhsSimple) {
                 if (auto rhsVar = dynamic_cast<Var*>(binOp->rhs.get())) {
                     int offset = functionVariables[currentFunction][rhsVar->name];
                     EmitLine("\tldr x0, [x29, #" + std::to_string(offset) + "]");
-                } else if (auto rhsConst = dynamic_cast<Constant*>(binOp->rhs.get())) {
-                    EmitLine("\tmov x0, #" + std::to_string(rhsConst->value));
+                } else if (auto rhsLiteral = dynamic_cast<Literal*>(binOp->rhs.get())) {
+                    EmitLine("\tmov x0, #" + std::to_string(rhsLiteral->value));
                 }
 
                 if (auto lhsVar = dynamic_cast<Var*>(binOp->lhs.get())) {
                     int offset = functionVariables[currentFunction][lhsVar->name];
                     EmitLine("\tldr x1, [x29, #" + std::to_string(offset) + "]");
-                } else if (auto lhsConst = dynamic_cast<Constant*>(binOp->lhs.get())) {
-                    EmitLine("\tmov x1, #" + std::to_string(lhsConst->value));
+                } else if (auto lhsLiteral = dynamic_cast<Literal*>(binOp->lhs.get())) {
+                    EmitLine("\tmov x1, #" + std::to_string(lhsLiteral->value));
                 }
             } else if (lhsSimple) {
                 GenerateExp(binOp->rhs);
                 if (auto lhsVar = dynamic_cast<Var*>(binOp->lhs.get())) {
                     int offset = functionVariables[currentFunction][lhsVar->name];
                     EmitLine("\tldr x1, [x29, #" + std::to_string(offset) + "]");
-                } else if (auto lhsConst = dynamic_cast<Constant*>(binOp->lhs.get())) {
-                    EmitLine("\tmov x1, #" + std::to_string(lhsConst->value));
+                } else if (auto lhsLiteral = dynamic_cast<Literal*>(binOp->lhs.get())) {
+                    EmitLine("\tmov x1, #" + std::to_string(lhsLiteral->value));
                 }
             } else if (rhsSimple) {
                 GenerateExp(binOp->lhs);
                 if (auto rhsVar = dynamic_cast<Var*>(binOp->rhs.get())) {
                     int offset = functionVariables[currentFunction][rhsVar->name];
                     EmitLine("\tldr x1, [x29, #" + std::to_string(offset) + "]");
-                } else if (auto rhsConst = dynamic_cast<Constant*>(binOp->rhs.get())) {
-                    EmitLine("\tmov x1, #" + std::to_string(rhsConst->value));
+                } else if (auto rhsLiteral = dynamic_cast<Literal*>(binOp->rhs.get())) {
+                    EmitLine("\tmov x1, #" + std::to_string(rhsLiteral->value));
                 }
             } else {
                 GenerateExp(binOp->rhs);
