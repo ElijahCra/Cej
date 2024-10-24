@@ -1,6 +1,4 @@
-//
 // Created by Elijah on 8/13/2024.
-//
 
 #ifndef LEXER_CPP
 #define LEXER_CPP
@@ -10,6 +8,9 @@
 #include <string_view>
 #include <stdexcept>
 #include <array>
+#include <fstream>
+#include <iostream>
+#include <optional>
 
 enum class TokenKind {
   TK_EOF,
@@ -35,172 +36,99 @@ enum class TokenKind {
 struct Token {
   TokenKind kind{};
   std::string raw_val;
-  std::unique_ptr<Token> next;
-};
-
-class TokenList {
-  public:
-
-  std::unique_ptr<Token> head;
-  explicit TokenList(std::unique_ptr<Token> head) : head(std::move(head)) {}
-
-  class Iterator {
-    Token* current;
-
-    public:
-    explicit Iterator(Token* start) : current(start) {}
-
-    Token& operator*() const { return *current; }
-    Token* operator->() const { return current; }
-
-    Iterator& operator++() {
-      if (current) current = current->next.get();
-      return *this;
-    }
-
-    bool operator!=(const Iterator& other) const {
-      return current != other.current;
-    }
-  };
-
-  [[nodiscard]] Iterator begin() const { return Iterator(head.get()); }
-  [[nodiscard]] static Iterator end() { return Iterator(nullptr); }
 };
 
 class Lexer {
   public:
   static constexpr std::array<std::string_view,3> keyWords = {"return", "ret","int"};
 
-  static std::unique_ptr<Token>
-  MakeToken(const TokenKind kind, const std::string_view str) {
-    auto token = std::make_unique<Token>();
-    token->kind = kind;
-    token->raw_val = std::string(str);
-    return token;
+  explicit Lexer(const std::string& path): input() {
+    std::ifstream file(path);
+    if (!file.is_open()) {
+      std::cerr << "Failed to open file." << std::endl;
+      throw std::runtime_error("Failed to open file.");
+    }
+    input=std::move(file);
   }
 
-  static std::unique_ptr<Token>
-  TokensFromInput(std::string_view input) {
-    std::unique_ptr<Token> head = nullptr;
-    Token* tail = nullptr;
-
-    while (!input.empty()) {
-      std::unique_ptr<Token> newToken;
-
-      if (std::isspace(input.front())) {
-        input.remove_prefix(1);
+  std::optional<Token> getNextToken() {
+    char ch;
+    while (input.get(ch)) {
+      if (std::isspace(ch)) {
         continue;
       }
-      if (std::isdigit(input.front())) {
-        newToken = makeTokenFromInt(input);
-      } else if (std::isalpha(input.front())) {
-        newToken = makeTokenFromText(input);
-      } else if (std::ispunct(input.front())) {
-        newToken = makeTokenFromPunctuation(input);
-      } else {
-        throw std::runtime_error("Unexpected character: " + std::string(1, input.front()));
+      if (std::isdigit(ch)) {
+        return makeTokenFromInt(ch);
       }
+      if (std::isalpha(ch)) {
+        return makeTokenFromText(ch);
+      }
+      if (std::ispunct(ch)) {
+        return makeTokenFromPunctuation(ch);
+      }
+      throw std::runtime_error("Unexpected character: " + std::string(1, ch));
+    }
+    return Token{TokenKind::TK_EOF, ""};
+  }
 
-      if (!head) {
-        head = std::move(newToken);
-        tail = head.get();
-      } else {
-        tail->next = std::move(newToken);
-        tail = tail->next.get();
+  private:
+  std::ifstream input;
+
+  Token makeTokenFromInt(char firstChar) {
+    std::string value(1, firstChar);
+    char ch;
+    while (input.get(ch) && (std::isdigit(ch) || std::isspace(ch))) {
+      if (!std::isspace(ch)) {
+        value += ch;
       }
     }
-
-    if (tail) {
-      tail->next = MakeToken(TokenKind::TK_EOF, "");
-    } else {
-      head = MakeToken(TokenKind::TK_EOF, "");
+    if (input) {
+      input.putback(ch);
     }
-
-    return head;
+    return {TokenKind::TK_INT, value};
   }
 
-  static std::unique_ptr<Token>
-  makeTokenFromInt(std::string_view& input) { using enum TokenKind;
-    const std::string_view copy = input;
-    input.remove_prefix(1);
-    while (!input.empty()  && (std::isdigit(input.front()) || std::isspace(input.front()))) {
-      input.remove_prefix(1);
+  Token makeTokenFromText(char firstChar) {
+    std::string value(1, firstChar);
+    char ch;
+    while (input.get(ch) && (std::isalnum(ch) || ch == '_')) {
+      value += ch;
     }
-    std::string str(copy.begin(), input.begin());
-    std::erase_if(str, isspace);
-    return MakeToken(TK_INT, str);
+    if (input) {
+      input.putback(ch);
+    }
+    if (std::ranges::find(keyWords, value) != keyWords.end()) {
+      return {TokenKind::TK_KEYWORD, value};
+    }
+    return {TokenKind::TK_IDENTIFIER, value};
   }
 
-  static std::unique_ptr<Token>
-  makeTokenFromText(std::string_view& input) { using enum TokenKind;
-    const std::string_view copy = input;
-    input.remove_prefix(1);
-    while (!input.empty() && (std::isalnum(input.front()) || input.front() == '_')) {
-      input.remove_prefix(1);
-    }
-    std::string_view text{copy.begin(),input.begin()};
-    if (std::ranges::find(keyWords,text) != keyWords.end()) {
-      return MakeToken(TK_KEYWORD,text);
-    }
-    return MakeToken(TK_IDENTIFIER,text);
-  }
-
-  static std::unique_ptr<Token>
-  makeTokenFromPunctuation(std::string_view& input) {
+  Token makeTokenFromPunctuation(char firstChar) {
     using enum TokenKind;
-
-    if (input.size() >= 2) {
-      if (input.starts_with("::")) {
-        input.remove_prefix(2);
-        return MakeToken(TK_COLONCOLON, "::");
+    switch (firstChar) {
+      case '+': return {TK_PLUS, "+"};
+      case '-': return {TK_MINUS, "-"};
+      case '/': return {TK_SLASH, "/"};
+      case '*': return {TK_ASTERISK, "*"};
+      case ':': {
+        char next;
+        if (input.get(next)) {
+          if (next == ':') return {TK_COLONCOLON, "::"};
+          if (next == '=') return {TK_COLONEQUAL, ":="};
+          input.putback(next);
+        }
+        return {TK_COLON, ":"};
       }
-      if (input.starts_with(":=")) {
-        input.remove_prefix(2);
-        return MakeToken(TK_COLONEQUAL, ":=");
-      }
-    }
-
-    switch (input.front()) {
-      case '+':
-        input.remove_prefix(1);
-      return MakeToken(TK_PLUS, "+");
-      case '-':
-        input.remove_prefix(1);
-      return MakeToken(TK_MINUS, "-");
-      case '/':
-        input.remove_prefix(1);
-      return MakeToken(TK_SLASH, "/");
-      case '*':
-        input.remove_prefix(1);
-      return MakeToken(TK_ASTERISK, "*");
-      case ':':
-        input.remove_prefix(1);
-      return MakeToken(TK_COLON, ":");
-      case '=':
-        input.remove_prefix(1);
-      return MakeToken(TK_EQUAL, "=");
-      case ';':
-        input.remove_prefix(1);
-      return MakeToken(TK_SEMICOLON, ";");
-      case '{':
-        input.remove_prefix(1);
-      return MakeToken(TK_OPEN_BRACE, "{");
-      case '}':
-        input.remove_prefix(1);
-      return MakeToken(TK_CLOSE_BRACE, "}");
-      case '(':
-        input.remove_prefix(1);
-      return MakeToken(TK_OPEN_PAREN, "(");
-      case ')':
-        input.remove_prefix(1);
-      return MakeToken(TK_CLOSE_PAREN, ")");
-      case ',':
-        input.remove_prefix(1);
-      return MakeToken(TK_COMMA, ",");
-      default:
-        throw std::runtime_error("non valid punctuation in program found in lexer");
+      case '=': return {TK_EQUAL, "="};
+      case ';': return {TK_SEMICOLON, ";"};
+      case '{': return {TK_OPEN_BRACE, "{"};
+      case '}': return {TK_CLOSE_BRACE, "}"};
+      case '(': return {TK_OPEN_PAREN, "("};
+      case ')': return {TK_CLOSE_PAREN, ")"};
+      case ',': return {TK_COMMA, ","};
+      default: throw std::runtime_error("Invalid punctuation");
     }
   }
 };
-#endif// LEXER_CPP
 
+#endif // LEXER_CPP
