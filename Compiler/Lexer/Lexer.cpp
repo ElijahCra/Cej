@@ -4,39 +4,15 @@
 #define LEXER_CPP
 
 #include <string>
-#include <memory>
 #include <string_view>
 #include <stdexcept>
 #include <array>
 #include <fstream>
 #include <iostream>
 #include <optional>
+#include "Token.hpp"
 
-enum class TokenKind {
-  TK_EOF,
-  TK_INT,
-  TK_KEYWORD,
-  TK_IDENTIFIER,
-  TK_PLUS,
-  TK_MINUS,
-  TK_SLASH,
-  TK_ASTERISK,
-  TK_COLON,
-  TK_COLONCOLON,
-  TK_EQUAL,
-  TK_COLONEQUAL,
-  TK_SEMICOLON,
-  TK_OPEN_BRACE,
-  TK_CLOSE_BRACE,
-  TK_OPEN_PAREN,
-  TK_CLOSE_PAREN,
-  TK_COMMA
-};
 
-struct Token {
-  TokenKind kind{};
-  std::string raw_val;
-};
 
 class Lexer {
   public:
@@ -55,6 +31,7 @@ class Lexer {
     if (input.is_open()) {
       input.close();
     }
+    std::cout << std::format("Processed {} lines in lexer",lineCount);
   }
   Lexer(const Lexer&) = delete;
   Lexer& operator=(const Lexer&) = delete;
@@ -62,6 +39,10 @@ class Lexer {
   std::optional<Token> getNextToken() {
     char ch;
     while (input.get(ch)) {
+      if('\n' == ch) {
+        lineCount += 1;
+        continue;
+      }
       if (std::isspace(ch)) {
         continue;
       }
@@ -79,8 +60,13 @@ class Lexer {
     return Token{TokenKind::TK_EOF, ""};
   }
 
+  std::string getCurrentLine() {
+    return std::format("{}",lineCount);
+  }
+
   private:
   std::ifstream input;
+  int lineCount=1;
 
   Token makeTokenFromInt(char firstChar) {
     std::string value(1, firstChar);

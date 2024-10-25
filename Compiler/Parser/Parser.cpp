@@ -7,8 +7,7 @@
 #include <string>
 #include <vector>
 #include <utility>
-#include <unordered_map>
-#include "Lexer.cpp"
+#include "../Lexer/Lexer.cpp"
 #include "ParserTypes.hpp"
 
 
@@ -92,7 +91,7 @@ class Parser {
           Expect(";");
           return std::make_unique<Declare>(std::move(name), std::move(type));
         }
-        throw std::runtime_error("Provided type not in system types");
+        throw std::runtime_error("Provided type not in system types in line: " + lexer.getCurrentLine());
       }
 
       if (currentToken && currentToken->raw_val == "=") {
@@ -101,9 +100,9 @@ class Parser {
         Expect(";");
         return std::make_unique<ExpStatement>(std::make_unique<Assign>(std::move(name), std::move(exp)));
       }
-      throw std::runtime_error("Unexpected token after identifier");
+      throw std::runtime_error("Unexpected token after identifier in line: " + lexer.getCurrentLine());
     }
-    throw std::runtime_error("Unexpected statement");
+    throw std::runtime_error("Unexpected statement in line: " + lexer.getCurrentLine());
   }
 
   std::unique_ptr<Exp> ParseExpression() {
@@ -161,7 +160,7 @@ class Parser {
       Expect(")");
       return exp;
     }
-    throw std::runtime_error("Unexpected token in primary expression");
+    throw std::runtime_error("Unexpected token in primary expression in line: " + lexer.getCurrentLine());
   }
 
   std::unique_ptr<Exp> ParseFunctionCall(const std::string& name) {
@@ -178,7 +177,7 @@ class Parser {
 
   void Expect(const std::string_view expected) {
     if (!currentToken || currentToken->raw_val != expected) {
-      throw std::runtime_error("Expected '" + std::string(expected) + "', but got '" + (currentToken ? currentToken->raw_val : "<EOF>") + "'");
+      throw std::runtime_error("Expected '" + std::string(expected) + "', but got '" + (currentToken ? currentToken->raw_val : "<EOF>") + "' in line: " + lexer.getCurrentLine());
     }
     advance();
   }

@@ -7,7 +7,7 @@
 
 #include <sstream>
 #include <unordered_map>
-#include "Parser.cpp"
+#include "Parser/Parser.cpp"
 
 class Generator {
     inline static std::stringstream assembly;
