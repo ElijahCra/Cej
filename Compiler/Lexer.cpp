@@ -42,7 +42,7 @@ class Lexer {
   public:
   static constexpr std::array<std::string_view,3> keyWords = {"return", "ret","int"};
 
-  explicit Lexer(const std::string& path): input() {
+  explicit Lexer(const std::string& path) {
     std::ifstream file(path);
     if (!file.is_open()) {
       std::cerr << "Failed to open file." << std::endl;
@@ -50,6 +50,14 @@ class Lexer {
     }
     input=std::move(file);
   }
+
+  ~Lexer() {
+    if (input.is_open()) {
+      input.close();
+    }
+  }
+  Lexer(const Lexer&) = delete;
+  Lexer& operator=(const Lexer&) = delete;
 
   std::optional<Token> getNextToken() {
     char ch;
