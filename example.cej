@@ -1,0 +1,15 @@
+f :: () int {
+    return 2;
+}
+
+g :: () int {
+    var:int=3;
+    return f()+(2*var);
+}
+
+main :: () int {
+    a:int=1;
+    b:int=f();
+    c:int=3;
+    return (a+b)*(f()+g());
+}
