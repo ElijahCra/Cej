@@ -7,7 +7,7 @@
 
 #include <sstream>
 #include <unordered_map>
-#include "Parser/Parser.cpp"
+#include "../Parser/Parser.cpp"
 
 class Generator {
     inline static std::stringstream assembly;
@@ -18,7 +18,7 @@ class Generator {
 
     static void
     EmitLine(const std::string& line) {
-        std::cout << line << "\n";
+        assembly << line << "\n";
     }
 
     static void
