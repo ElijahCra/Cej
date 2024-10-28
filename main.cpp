@@ -18,9 +18,16 @@ int main(int argc, char *argv[]) {
 
     return 0;
   }
-  BuildSystem buildSystem;
-  buildSystem.ParseBuildFile("cej.build");
-  buildSystem.BuildAll();
-  buildSystem.GenerateMakefile("Makefile");
-  return 0;
+  if (2 == argc) {
+    std::cerr << "Usage: CejCompiler -b \"buildFilePath\"";
+    return 1;
+  }
+  if (3 == argc && std::string_view(argv[1]) == "-b") {
+    BuildSystem buildSystem;
+    buildSystem.ParseBuildFile(std::string(argv[2]));
+    buildSystem.BuildAll();
+    buildSystem.GenerateMakefile("Makefile");
+    return 0;
+  }
+
 }

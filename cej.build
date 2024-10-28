@@ -1,23 +1,28 @@
-[Library:mylib]
-sources = src/lib/file1.c, src/lib/file2.c
-include_dirs = include/
-output_dir = lib/
-compiler_flags = -O2
+# Define an executable that depends on 'mylib' and 'anotherlib'
+#[Project:CejCompiler]
+#source_dir = Output
+
+[Executable:CejExample]
+sources = example.cej
+output_dir = bin/
+#include_dirs = include/
+#libs = mylib, anotherlib
+#lib_dirs = lib/
+
+#compiler_flags = -O2
+
+#[Library:mylib]
+#sources = src/lib/file1.c, src/lib/file2.c
+#include_dirs = include/
+#output_dir = lib/
+#compiler_flags = -O2
 
 # Define another static library that depends on 'mylib'
-[Library:anotherlib]
-sources = src/anotherlib/another.c
-include_dirs = include/
-libs = mylib
-lib_dirs = lib/
-output_dir = lib/
-compiler_flags = -O2
+#[Library:anotherlib]
+#sources = src/anotherlib/another.c
+#include_dirs = include/
+#libs = mylib
+#lib_dirs = lib/
+#output_dir = lib/
+#compiler_flags = -O2
 
-# Define an executable that depends on 'mylib' and 'anotherlib'
-[Executable:myapp]
-sources = src/app/main.c
-include_dirs = include/
-libs = mylib, anotherlib
-lib_dirs = lib/
-output_dir = bin/
-compiler_flags = -O2

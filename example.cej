@@ -11,5 +11,5 @@ main :: () int {
     a:int=1;
     b:int=f();
     c:int=3;
-    return (a+b)*(f()+g());
+    return (a+b)*(f()+g())+39;
 }

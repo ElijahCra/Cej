@@ -18,9 +18,9 @@ class BuildTarget {
   std::string output_dir;
   std::string compiler_flags;
 
-  virtual void GenerateAssembly();
-  virtual void Assemble();
-  virtual void Link() = 0;
+  virtual void GenerateAssembly(const std::filesystem::path& buildDir);
+  virtual void Assemble(const std::filesystem::path& buildDir);
+  virtual void Link(const std::filesystem::path& buildDir) = 0;
 };
 
 

@@ -8,7 +8,7 @@
 #include <ranges>
 #include <sstream>
 #include "BuildSystem.hpp"
-#include "BuildTarget.hpp"
+#include "BuildTarget.cpp"
 
 
 void
@@ -144,33 +144,187 @@ BuildSystem::ParseBuildFile(const std::string& filename) {
 
         targets.push_back(target);
     }
+    std::filesystem::create_directories(buildDir);
+
 }
 
 void
-BuildSystem::BuildAll() {
+BuildSystem::BuildAll() const {
     for (auto& target : targets) {
-      target->GenerateAssembly();
-      target->Assemble();
-      target->Link();
+      target->GenerateAssembly(buildDir);
+      target->Assemble(buildDir);
+      target->Link(buildDir);
     }
 }
 
-void
-BuildSystem::GenerateMakefile(const std::string& filename) {
+void BuildSystem::GenerateMakefile(const std::string& filename) {
     std::ofstream makefile(filename);
-    // Write makefile contents based on targets
-    makefile << "all: ";
+
+    // Write variables
+    makefile << "CC = your_compiler\n";
+    makefile << "AS = as\n";
+    makefile << "LD = ld\n";
+    makefile << "CFLAGS = \n";
+    makefile << "LDFLAGS = -lSystem -syslibroot `xcrun -sdk macosx --show-sdk-path`\n\n";
+
+    // Write the 'all' target
+    makefile << "all:";
     for (const auto& target : targets) {
-      makefile << target->output_dir << target->name << " ";
+        std::string outputFile;
+        if (dynamic_cast<Library*>(target.get())) {
+            outputFile = target->output_dir + "/lib" + target->name + ".a";
+        } else if (dynamic_cast<Executable*>(target.get())) {
+            outputFile = target->output_dir + "/" + target->name;
+        }
+        makefile << " " << outputFile;
     }
     makefile << "\n\n";
 
-    // For each target, write the rules
+    // For each target, generate the Makefile rules
     for (const auto& target : targets) {
-      // Generate makefile rules for each target
-      // Include dependencies, commands, etc.
+        if (auto* lib = dynamic_cast<Library*>(target.get())) {
+            GenerateMakefileForLibrary(makefile, lib);
+        } else if (auto* exe = dynamic_cast<Executable*>(target.get())) {
+            GenerateMakefileForExecutable(makefile, exe);
+        }
     }
+
+    // Add a clean target
+    makefile << "clean:\n\t";
+    makefile << "rm -f *.o *.s";
+    for (const auto& target : targets) {
+        if (dynamic_cast<Library*>(target.get())) {
+            makefile << " " << target->output_dir << "/lib" << target->name << ".a";
+        } else if (dynamic_cast<Executable*>(target.get())) {
+            makefile << " " << target->output_dir << "/" << target->name;
+        }
+    }
+    makefile << "\n";
+
     makefile.close();
+}
+
+// Implementation for libraries
+void
+BuildSystem::GenerateMakefileForLibrary(std::ofstream& makefile, Library* lib) {
+    std::string libFile = lib->output_dir + "/lib" + lib->name + ".a";
+    std::vector<std::string> objectFiles;
+
+    // Generate rules for each source file
+    for (const auto& source : lib->sources) {
+        std::string uniqueName = GetUniqueObjectName(source);
+        std::string assemblyFile = uniqueName + ".s";
+        std::string objectFile = uniqueName + ".o";
+        objectFiles.push_back(objectFile);
+
+        // Rule to generate assembly (.s) from source (.cej)
+        makefile << assemblyFile << ": " << source << "\n\t";
+        makefile << "$(CC) " << source << " -o " << assemblyFile;
+        for (const auto& dir : lib->include_dirs) {
+            makefile << " -I" << dir;
+        }
+        if (!lib->compiler_flags.empty()) {
+            makefile << " " << lib->compiler_flags;
+        }
+        makefile << "\n\n";
+
+        // Rule to assemble (.s to .o)
+        makefile << objectFile << ": " << assemblyFile << "\n\t";
+        makefile << "$(AS) -o " << objectFile << " " << assemblyFile << "\n\n";
+    }
+
+    // Rule to create the static library
+    makefile << libFile << ":";
+    for (const auto& obj : objectFiles) {
+        makefile << " " << obj;
+    }
+    // Add dependencies on other libraries
+    for (const auto& depLibName : lib->libs) {
+        for (const auto& target : targets) {
+            if (auto* depLib = dynamic_cast<Library*>(target.get())) {
+                if (depLib->name == depLibName) {
+                    makefile << " " << depLib->output_dir << "/lib" << depLib->name << ".a";
+                }
+            }
+        }
+    }
+    makefile << "\n\tar rcs " << libFile;
+    for (const auto& obj : objectFiles) {
+        makefile << " " << obj;
+    }
+    makefile << "\n\n";
+}
+
+// Implementation for executables
+void
+BuildSystem::GenerateMakefileForExecutable(std::ofstream& makefile, Executable* exe) {
+    std::string exeFile = exe->output_dir + "/" + exe->name;
+    std::vector<std::string> objectFiles;
+
+    // Generate rules for each source file
+    for (const auto& source : exe->sources) {
+        std::string uniqueName = GetUniqueObjectName(source);
+        std::string assemblyFile = uniqueName + ".s";
+        std::string objectFile = uniqueName + ".o";
+        objectFiles.push_back(objectFile);
+
+        // Rule to generate assembly (.s) from source (.cej)
+        makefile << assemblyFile << ": " << source << "\n\t";
+        makefile << "$(CC) " << source << " -o " << assemblyFile;
+        for (const auto& dir : exe->include_dirs) {
+            makefile << " -I" << dir;
+        }
+        if (!exe->compiler_flags.empty()) {
+            makefile << " " << exe->compiler_flags;
+        }
+        makefile << "\n\n";
+
+        // Rule to assemble (.s to .o)
+        makefile << objectFile << ": " << assemblyFile << "\n\t";
+        makefile << "$(AS) -o " << objectFile << " " << assemblyFile << "\n\n";
+    }
+
+    // Rule to link the executable
+    makefile << exeFile << ":";
+    for (const auto& obj : objectFiles) {
+        makefile << " " << obj;
+    }
+    // Add dependencies on libraries
+    for (const auto& libName : exe->libs) {
+        for (const auto& target : targets) {
+            if (auto* lib = dynamic_cast<Library*>(target.get())) {
+                if (lib->name == libName) {
+                    makefile << " " << lib->output_dir << "/lib" << lib->name << ".a";
+                }
+            }
+        }
+    }
+    makefile << "\n\t$(LD) -o " << exeFile;
+    for (const auto& obj : objectFiles) {
+        makefile << " " << obj;
+    }
+    // Add library directories
+    for (const auto& dir : exe->lib_dirs) {
+        makefile << " -L" << dir;
+    }
+    // Link libraries
+    for (const auto& lib : exe->libs) {
+        makefile << " -l" << lib;
+    }
+    if (!exe->compiler_flags.empty()) {
+        makefile << " " << exe->compiler_flags;
+    }
+    makefile << " $(LDFLAGS)\n\n";
+}
+
+// Helper function to generate unique object and assembly filenames
+std::string
+BuildSystem::GetUniqueObjectName(const std::string& sourceFile) {
+    std::string name = sourceFile;
+    std::ranges::replace(name, '/', '_');
+    std::ranges::replace(name, '\\', '_');
+    std::ranges::replace(name, '.', '_');
+    return name;
 }
 
 // Helper function to split strings based on a delimiter and trim whitespace
@@ -181,10 +335,10 @@ BuildSystem::split(const std::string& s, char delimiter) {
     std::istringstream tokenStream(s);
     while (std::getline(tokenStream, item, delimiter)) {
         // Trim leading and trailing whitespace
-        item.erase(item.begin(), std::find_if(item.begin(), item.end(),
-            [](unsigned char ch) { return !std::isspace(ch); }));
+        item.erase(item.begin(), std::ranges::find_if(item,
+                                                      [](unsigned char ch) { return !std::isspace(ch); }));
         item.erase(std::find_if(item.rbegin(), item.rend(),
-            [](unsigned char ch) { return !std::isspace(ch); }).base(), item.end());
+            [](const unsigned char ch) { return !std::isspace(ch); }).base(), item.end());
         tokens.push_back(item);
     }
     return tokens;
