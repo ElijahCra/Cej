@@ -158,7 +158,9 @@ BuildSystem::BuildAll() const {
 }
 
 void BuildSystem::GenerateMakefile(const std::string& filename) {
-    std::ofstream makefile(filename);
+
+
+    std::ofstream makefile(buildDir/filename);
 
     // Write variables
     makefile << "CC = your_compiler\n";
