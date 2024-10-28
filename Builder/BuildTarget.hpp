@@ -6,6 +6,7 @@
 #define BUILDTARGET_HPP
 
 #include <vector>
+#include <filesystem>
 
 class BuildTarget {
   public:

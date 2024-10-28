@@ -8,7 +8,16 @@
 #include <ranges>
 #include <sstream>
 #include "BuildSystem.hpp"
+
+#include <bits/ranges_algo.h>
+
 #include "BuildTarget.cpp"
+
+#ifdef _WIN32
+#define windowsOS true
+#else
+#define windowsOS false
+#endif
 
 
 void
@@ -27,9 +36,9 @@ BuildSystem::ParseBuildFile(const std::string& filename) {
 
     while (std::getline(infile, line)) {
         // Remove leading and trailing whitespace
-        line.erase(line.begin(), std::find_if(line.begin(), line.end(),
+        line.erase(line.begin(), std::ranges::find_if(line.begin(), line.end(),
             [](unsigned char ch) { return !std::isspace(ch); }));
-        line.erase(std::find_if(line.rbegin(), line.rend(),
+        line.erase(std::ranges::find_if(line.rbegin(), line.rend(),
             [](unsigned char ch) { return !std::isspace(ch); }).base(), line.end());
 
         // Skip empty lines or comments
@@ -100,9 +109,9 @@ BuildSystem::ParseBuildFile(const std::string& filename) {
             std::string value = line.substr(equal_pos + 1);
 
             // Trim whitespace from key and value
-            key.erase(std::find_if(key.rbegin(), key.rend(),
+            key.erase(std::ranges::find_if(key.rbegin(), key.rend(),
                 [](unsigned char ch) { return !std::isspace(ch); }).base(), key.end());
-            value.erase(value.begin(), std::find_if(value.begin(), value.end(),
+            value.erase(value.begin(), std::ranges::find_if(value.begin(), value.end(),
                 [](unsigned char ch) { return !std::isspace(ch); }));
 
             current_properties[key] = value;
@@ -152,6 +161,10 @@ void
 BuildSystem::BuildAll() const {
     for (auto& target : targets) {
       target->GenerateAssembly(buildDir);
+      if (windowsOS) {
+          std::cout << "Skipping assembler / linker - Only supporting arm architecture currently" << std::endl;
+          return;
+      }
       target->Assemble(buildDir);
       target->Link(buildDir);
     }
@@ -339,7 +352,7 @@ BuildSystem::split(const std::string& s, char delimiter) {
         // Trim leading and trailing whitespace
         item.erase(item.begin(), std::ranges::find_if(item,
                                                       [](unsigned char ch) { return !std::isspace(ch); }));
-        item.erase(std::find_if(item.rbegin(), item.rend(),
+        item.erase(std::ranges::find_if(item.rbegin(), item.rend(),
             [](const unsigned char ch) { return !std::isspace(ch); }).base(), item.end());
         tokens.push_back(item);
     }
