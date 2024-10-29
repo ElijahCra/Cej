@@ -39,8 +39,12 @@ class Lexer {
   std::optional<Token> getNextToken() {
     char ch;
     while (input.get(ch)) {
+      if (positionCount == 0) {
+        lineCount++;
+      }
+      positionCount++;
       if('\n' == ch) {
-        lineCount += 1;
+        positionCount = 0;
         continue;
       }
       if (std::isspace(ch)) {
@@ -60,13 +64,19 @@ class Lexer {
     return Token{TokenKind::TK_EOF, ""};
   }
 
-  std::string getCurrentLine() {
-    return std::format("{}",lineCount);
+  [[nodiscard]] int
+  getCurrentLine() const {
+    return lineCount;
+  }
+  [[nodiscard]] int
+  getCurrentPosition() const {
+    return positionCount;
   }
 
   private:
   std::ifstream input;
-  int lineCount=1;
+  int lineCount=0;
+  int positionCount=0;
   const std::string path;
 
   Token makeTokenFromInt(char firstChar) {

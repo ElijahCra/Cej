@@ -9,31 +9,39 @@
 #include <utility>
 #include "../Lexer/Lexer.cpp"
 #include "ParserTypes.hpp"
+#include "ExpressionParser.hpp"
+#include "ParsingContext.hpp"
 
 
 
 
 class Parser {
   public:
-  explicit Parser(Lexer& lexer) : lexer(lexer) {
-    currentToken = lexer.getNextToken();
+  explicit Parser(Lexer& lexer)
+      : context(lexer),
+        expressionParser(context),
+        statementParser(context),
+        functionParser(context) {
+
   }
 
-  std::unique_ptr<Program> Parse() {
-    return ParseProgram();
+  std::unique_ptr<Program> parse() {
+    return parseProgram();
   }
 
   private:
-  Lexer& lexer;
-  std::optional<Token> currentToken;
+  ParsingContext context;
+  ExpressionParser expressionParser;
+  StatementParser statementParser;
+  FunctionParser functionParser;
 
   void advance() {
     currentToken = lexer.getNextToken();
   }
 
-  std::unique_ptr<Program> ParseProgram() {
+  std::unique_ptr<Program> parseProgram() {
     std::vector<std::unique_ptr<Function>> functions;
-    while (currentToken && currentToken->kind != TokenKind::TK_EOF) {
+    while (context.currentToken && context.currentToken->kind != TokenKind::TK_EOF) {
       functions.push_back(ParseFunction());
     }
     return std::make_unique<Program>(std::move(functions));
