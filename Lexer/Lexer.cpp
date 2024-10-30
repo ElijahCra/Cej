@@ -1,5 +1,6 @@
 // Created by Elijah on 8/13/2024.
 
+#include <format>
 #ifndef LEXER_CPP
 #define LEXER_CPP
 

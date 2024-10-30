@@ -29,9 +29,28 @@ public:
             return ParseNamespaceDef();
         }
         if (context.currentToken && context.currentToken->kind == TokenKind::TK_IDENTIFIER) {
-            return ParseExpressionStatement();
+            std::string name = context.currentToken->raw_val;
+            context.advance();
+
+            if (context.currentToken && context.currentToken->raw_val == ":") {
+                context.advance();
+                if (context.currentToken && context.currentToken->raw_val == "int") {
+                    std::string type = context.currentToken->raw_val;
+                    context.advance();
+
+                    if (context.currentToken && context.currentToken->raw_val == "=") {
+                        context.advance();
+                        auto initializer = expressionParser.ParseExpression();
+                        Expect(";");
+                        return std::make_unique<Declare>(std::move(name), std::move(type), std::move(initializer));
+                    }
+                    Expect(";");
+                    return std::make_unique<Declare>(std::move(name), std::move(type));
+                }
+                throw std::runtime_error("Provided type not in system types in line: " + context.getCurrentLine());
+            }
         }
-        if (context.currentToken && (context.currentToken->raw_val == "int" || context.currentToken->raw_val == "string" || context.currentToken->raw_val == "bool")) {
+        if (context.currentToken && context.currentToken->raw_val == "int" ) {
             return ParseVariableDeclaration();
         }
 
@@ -51,12 +70,6 @@ private:
         }
         Expect(";");
         return std::make_unique<Declare>(std::move(name), std::move(type), std::move(initializer));
-    }
-
-    std::unique_ptr<Statement> ParseExpressionStatement() {
-        auto exp = expressionParser.ParseExpression();
-        Expect(";");
-        return std::make_unique<ExpStatement>(std::move(exp));
     }
 
     std::unique_ptr<Statement> ParseClassDef() {
