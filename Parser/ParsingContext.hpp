@@ -20,10 +20,16 @@ struct ParsingContext {
     currentToken = lexer.getNextToken();
   }
 
+  [[nodiscard]] std::optional<Token>
+  checkForDoubleColon() const {
+    return lexer.peekForDoubleColon();
+  }
+
   [[nodiscard]] int
   getCurrentLine() const {
     return lexer.getCurrentLine();
   }
+
   [[nodiscard]] int
   getCurrentPosition() const {
     return lexer.getCurrentPosition();

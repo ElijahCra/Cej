@@ -36,7 +36,26 @@ class Lexer {
   Lexer(const Lexer&) = delete;
   Lexer& operator=(const Lexer&) = delete;
 
-  std::optional<Token> getNextToken() {
+  std::optional<Token>
+  peekForDoubleColon() {
+    while (std::isspace(input.peek())) {
+      input.get();
+      positionCount += 1;
+    }
+    char first = 0;
+    char second = 0;
+    if (input.get(first)) {
+      second=static_cast<char>(input.peek());
+      input.putback(first);
+    }
+    if (first == ':' && second == ':') {
+      return Token{TokenKind::TK_COLONCOLON,"::"};
+    }
+    return std::nullopt;
+  }
+
+  std::optional<Token>
+  getNextToken() {
     char ch;
     while (input.get(ch)) {
       if (positionCount == 0) {
@@ -79,7 +98,8 @@ class Lexer {
   int positionCount=0;
   const std::string path;
 
-  Token makeTokenFromInt(char firstChar) {
+  Token
+  makeTokenFromInt(char firstChar) {
     std::string value(1, firstChar);
     char ch;
     while (input.get(ch) && (std::isdigit(ch) || std::isspace(ch))) {
@@ -93,7 +113,8 @@ class Lexer {
     return {TokenKind::TK_INT, value};
   }
 
-  Token makeTokenFromText(char firstChar) {
+  Token
+  makeTokenFromText(char firstChar) {
     std::string value(1, firstChar);
     char ch;
     while (input.get(ch) && (std::isalnum(ch) || ch == '_')) {
@@ -108,7 +129,8 @@ class Lexer {
     return {TokenKind::TK_IDENTIFIER, value};
   }
 
-  Token makeTokenFromPunctuation(char firstChar) {
+  Token
+  makeTokenFromPunctuation(char firstChar) {
     using enum TokenKind;
     switch (firstChar) {
       case '+': return {TK_PLUS, "+"};

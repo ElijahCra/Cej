@@ -20,13 +20,13 @@ class ParserBase {
 
     void Expect(const std::string_view expected) {
         if (!context.currentToken || context.currentToken->raw_val != expected) {
-            throw std::runtime_error("Expected '" + std::string(expected) + "', but got '" + (context.currentToken ? context.currentToken->raw_val : "<EOF>") + "' in line: " + std::to_string(context.getCurrentLine()) + "and position: '" + std::to_string(context.getCurrentPosition()) + "'");
+            throw std::runtime_error("Expected '" + std::string(expected) + "', but got '" + (context.currentToken ? context.currentToken->raw_val : "<EOF>") + "' in line: " + std::to_string(context.getCurrentLine()) + " and position: " + std::to_string(context.getCurrentPosition())+'\n');
         }
         context.advance();
     }
 
     public:
-    ParserBase(ParsingContext& context) : context(context) {}
+    explicit ParserBase(ParsingContext& context) : context(context) {}
 };
 
 #endif //PARSERBASE_HPP

@@ -9,12 +9,13 @@
 #include <sstream>
 #include "BuildSystem.hpp"
 
-#include <bits/ranges_algo.h>
+
 
 #include "BuildTarget.cpp"
 
 #ifdef _WIN32
 #define windowsOS true
+#include <bits/ranges_algo.h>
 #else
 #define windowsOS false
 #endif

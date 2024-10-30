@@ -1,4 +1,3 @@
-#include <format>
 #include <iostream>
 
 #include "Builder/BuildSystem.cpp"
@@ -11,7 +10,7 @@ int main(int argc, char *argv[]) {
   if (1 == argc && **argv == '/') {
     Lexer lexer("../example.cej");
     Parser parser(lexer);
-    auto tree = parser.Parse();
+    auto tree = parser.parseUnit();
     std::string outData = Generator::GenerateAssembly(tree);
 
     std::ofstream outFile("output.s");

@@ -21,18 +21,18 @@ struct Exp : ASTNode {};
 struct Statement : ASTNode {};
 
 // Program Node
-struct Program : ASTNode {
+struct CompilationUnit : ASTNode {
     std::vector<std::unique_ptr<Statement>> statements;
-    explicit Program(std::vector<std::unique_ptr<Statement>> s) : statements(std::move(s)) {}
+    explicit CompilationUnit(std::vector<std::unique_ptr<Statement>> s) : statements(std::move(s)) {}
 };
 
 // Function Node
-struct Function : Statement {
+struct FunctionDef : Statement {
     std::string name;
     int allocationSize;
     std::string returnType;
     std::vector<std::unique_ptr<Statement>> statements;
-    Function(std::string n, int allocationSize, std::string rt, std::vector<std::unique_ptr<Statement>> s)
+    FunctionDef(std::string n, int allocationSize, std::string rt, std::vector<std::unique_ptr<Statement>> s)
         : name(std::move(n)), allocationSize(allocationSize), returnType(std::move(rt)), statements(std::move(s)) {}
 };
 
