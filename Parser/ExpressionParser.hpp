@@ -2,6 +2,8 @@
 // Created by Elijah on 10/29/2024.
 //
 
+// ExpressionParser.hpp
+
 #ifndef EXPRESSIONPARSER_HPP
 #define EXPRESSIONPARSER_HPP
 
@@ -54,17 +56,36 @@ private:
             return std::make_unique<Literal>(value);
         }
         if (context.currentToken && context.currentToken->kind == TokenKind::TK_IDENTIFIER) {
+            std::string ns = "";
             std::string name = context.currentToken->raw_val;
             context.advance();
+            // Handle namespace qualification
+            while (context.currentToken && context.currentToken->raw_val == "::") {
+                context.advance();
+                if (ns.empty()) {
+                    ns = name;
+                } else {
+                    ns += "::" + name;
+                }
+                if (context.currentToken && context.currentToken->kind == TokenKind::TK_IDENTIFIER) {
+                    name = context.currentToken->raw_val;
+                    context.advance();
+                } else {
+                    throw std::runtime_error("Expected identifier after '::' in line: " + std::to_string(context.getCurrentLine()));
+                }
+            }
+            if (ns.empty()) {
+                ns = context.getCurrentNamespace();
+            }
             if (context.currentToken && context.currentToken->raw_val == "(") {
                 // Function call or object creation
-                return ParseFunctionOrObjectCreation(std::move(name));
+                return ParseFunctionOrObjectCreation(std::move(name), ns);
             }
             if (context.currentToken && context.currentToken->raw_val == ".") {
                 // Member access
-                return ParseMemberAccess(std::make_unique<Var>(std::move(name)));
+                return ParseMemberAccess(std::make_unique<Var>(std::move(name), ns));
             }
-            return std::make_unique<Var>(std::move(name));
+            return std::make_unique<Var>(std::move(name), ns);
         }
         if (context.currentToken && context.currentToken->raw_val == "(") {
             context.advance();
@@ -75,7 +96,7 @@ private:
         throw std::runtime_error("Unexpected token in primary expression in line: " + std::to_string(context.getCurrentLine()));
     }
 
-    std::unique_ptr<Exp> ParseFunctionOrObjectCreation(std::string name) {
+    std::unique_ptr<Exp> ParseFunctionOrObjectCreation(std::string name, std::string ns = "") {
         Expect("(");
         std::vector<std::unique_ptr<Exp>> arguments;
         if (context.currentToken && context.currentToken->raw_val != ")") {
@@ -89,7 +110,7 @@ private:
             return std::make_unique<ObjectCreation>(std::move(name), std::move(arguments));
         } else {
             // Function call
-            return std::make_unique<FunctionCall>(std::move(name), std::move(arguments));
+            return std::make_unique<FunctionCall>(std::move(name), std::move(ns), std::move(arguments));
         }
     }
 

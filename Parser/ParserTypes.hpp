@@ -2,6 +2,8 @@
 // Created by Elijah on 10/24/2024.
 //
 
+// ParserTypes.hpp
+
 #ifndef PARSERTYPES_HPP
 #define PARSERTYPES_HPP
 
@@ -32,10 +34,11 @@ struct FunctionDef : Statement {
     int allocationSize;
     std::string returnType;
     std::vector<std::unique_ptr<Statement>> statements;
-    FunctionDef(std::string n, int allocationSize, std::string rt, std::vector<std::unique_ptr<Statement>> s)
-        : name(std::move(n)), allocationSize(allocationSize), returnType(std::move(rt)), statements(std::move(s)) {}
-};
+    std::string ns;
 
+    FunctionDef(std::string n, int allocationSize, std::string rt, std::vector<std::unique_ptr<Statement>> s, std::string ns)
+        : name(std::move(n)), allocationSize(allocationSize), returnType(std::move(rt)), statements(std::move(s)), ns(std::move(ns)) {}
+};
 
 // Return Statement
 struct Return : Statement {
@@ -48,8 +51,10 @@ struct Declare : Statement {
     std::string name;
     std::string type;
     std::optional<std::unique_ptr<Exp>> initializer;
-    Declare(std::string n, std::string type,std::optional<std::unique_ptr<Exp>> i = std::nullopt)
-        : name(std::move(n)), type(std::move(type)), initializer(std::move(i)) {}
+    std::string ns;
+
+    Declare(std::string n, std::string type, std::optional<std::unique_ptr<Exp>> i, std::string ns)
+        : name(std::move(n)), type(std::move(type)), initializer(std::move(i)), ns(std::move(ns)) {}
 };
 
 // Expression Statement
@@ -62,8 +67,10 @@ struct ExpStatement : Statement {
 struct ClassDef : Statement {
     std::string name;
     std::vector<std::unique_ptr<Statement>> members;
-    ClassDef(std::string n, std::vector<std::unique_ptr<Statement>> m)
-        : name(std::move(n)), members(std::move(m)) {}
+    std::string ns;
+
+    ClassDef(std::string n, std::vector<std::unique_ptr<Statement>> m, std::string ns)
+        : name(std::move(n)), members(std::move(m)), ns(std::move(ns)) {}
 };
 
 // Namespace Definition
@@ -77,21 +84,27 @@ struct NamespaceDef : Statement {
 // Variable Expression
 struct Var : Exp {
     std::string name;
-    explicit Var(std::string n) : name(std::move(n)) {}
+    std::string ns;
+
+    Var(std::string n, std::string ns) : name(std::move(n)), ns(std::move(ns)) {}
 };
 
 struct Assign : Exp {
     std::string name;
+    std::string ns;
     std::unique_ptr<Exp> value;
-    Assign(std::string n, std::unique_ptr<Exp> v) : name(std::move(n)), value(std::move(v)) {}
+
+    Assign(std::string n, std::string ns, std::unique_ptr<Exp> v) : name(std::move(n)), ns(std::move(ns)), value(std::move(v)) {}
 };
 
 // Function Call
 struct FunctionCall : Exp {
     std::string name;
+    std::string ns;
     std::vector<std::unique_ptr<Exp>> arguments;
-    FunctionCall(std::string n, std::vector<std::unique_ptr<Exp>> args)
-        : name(std::move(n)), arguments(std::move(args)) {}
+
+    FunctionCall(std::string n, std::string ns, std::vector<std::unique_ptr<Exp>> args)
+        : name(std::move(n)), ns(std::move(ns)), arguments(std::move(args)) {}
 };
 
 // Object Creation
@@ -139,4 +152,3 @@ struct Literal : Exp {
 };
 
 #endif // PARSERTYPES_HPP
-

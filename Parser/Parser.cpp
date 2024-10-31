@@ -1,5 +1,7 @@
 // Created by Elijah on 8/13/2024.
 
+#// Parser.cpp
+
 #ifndef PARSER_CPP
 #define PARSER_CPP
 
@@ -33,9 +35,32 @@ class Parser {
   FunctionParser functionParser;
 
   bool IsFunctionDefinition() {
-    return context.currentToken && context.currentToken->kind == TokenKind::TK_IDENTIFIER && context.checkForDoubleColon().has_value();
-  }
+    auto tokenIter = context.currentToken;
+    if (!tokenIter || tokenIter->kind != TokenKind::TK_IDENTIFIER) {
+      return false;
+    }
 
+    // Simulate parsing namespace-qualified name
+    while (tokenIter && tokenIter->kind == TokenKind::TK_IDENTIFIER) {
+      tokenIter = context.peekNextToken();
+      if (tokenIter && tokenIter->raw_val == "::") {
+        lexer.consumeToken();
+        tokenIter = lexer.peekNextToken();
+        if (!tokenIter || tokenIter->kind != TokenKind::TK_IDENTIFIER) {
+          return false;
+        }
+        lexer.consumeToken();
+      } else {
+        break;
+      }
+    }
+
+    // After parsing name, check for '('
+    if (tokenIter && tokenIter->raw_val == "(") {
+      return true;
+    }
+    return false;
+  }
 };
 
 #endif // PARSER_CPP
