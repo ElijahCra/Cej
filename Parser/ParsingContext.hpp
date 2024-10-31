@@ -5,24 +5,37 @@
 #ifndef PARSINGCONTEXT_HPP
 #define PARSINGCONTEXT_HPP
 
+#include <deque>
+
 #include "../Lexer/Lexer.cpp"
 
 struct ParsingContext {
   Lexer& lexer;
-  std::optional<Token> currentToken;
+  std::deque<Token> tokenQueue;
+  Token currentToken;
 
   explicit ParsingContext(Lexer& lexer) : lexer(lexer) {
-    currentToken = lexer.getNextToken();
+    currentToken= lexer.getNextToken();
   }
 
   void
   advance() {
-    currentToken = lexer.getNextToken();
+    if (tokenQueue.empty()) {
+      currentToken = lexer.getNextToken();
+    } else {
+      currentToken = tokenQueue.front();
+      tokenQueue.pop_front();
+    }
   }
 
-  [[nodiscard]] std::optional<Token>
-  checkForDoubleColon() const {
-    return lexer.peekForDoubleColon();
+  [[nodiscard]] Token
+  addNextTokenToDequeue() {
+    tokenQueue.emplace_back(lexer.getNextToken());
+    return tokenQueue.back();
+  }
+  [[nodiscard]] Token
+  getLastTokenFromQueue() {
+    return tokenQueue.back();
   }
 
   [[nodiscard]] int

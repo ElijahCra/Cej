@@ -16,29 +16,29 @@ public:
     }
 
     std::unique_ptr<Statement> ParseStatement() {
-        if (context.currentToken && context.currentToken->raw_val == "return") {
+        if (context.currentToken.raw_val == "return") {
             context.advance();
             auto exp = expressionParser.ParseExpression();
             Expect(";");
             return std::make_unique<Return>(std::move(exp));
         }
-        if (context.currentToken && context.currentToken->raw_val == "class") {
+        if (context.currentToken.raw_val == "class") {
             return ParseClassDef();
         }
-        if (context.currentToken && context.currentToken->raw_val == "namespace") {
+        if (context.currentToken.raw_val == "namespace") {
             return ParseNamespaceDef();
         }
-        if (context.currentToken && context.currentToken->kind == TokenKind::TK_IDENTIFIER) {
-            std::string name = context.currentToken->raw_val;
+        if (context.currentToken.kind == TokenKind::TK_IDENTIFIER) {
+            std::string name = context.currentToken.raw_val;
             context.advance();
 
-            if (context.currentToken && context.currentToken->raw_val == ":") {
+            if (context.currentToken.raw_val == ":") {
                 context.advance();
-                if (context.currentToken && context.currentToken->raw_val == "int") {
-                    std::string type = context.currentToken->raw_val;
+                if (context.currentToken.raw_val == "int") {
+                    std::string type = context.currentToken.raw_val;
                     context.advance();
 
-                    if (context.currentToken && context.currentToken->raw_val == "=") {
+                    if (context.currentToken.raw_val == "=") {
                         context.advance();
                         auto initializer = expressionParser.ParseExpression();
                         Expect(";");
@@ -49,7 +49,7 @@ public:
                 }
                 throw std::runtime_error("Provided type not in system types in line: " + std::to_string(context.getCurrentLine()));
             }
-            if (context.currentToken && context.currentToken->raw_val == "=") {
+            if (context.currentToken.raw_val == "=") {
                 context.advance();
                 auto exp = expressionParser.ParseExpression();
                 Expect(";");
@@ -57,7 +57,7 @@ public:
             }
             throw std::runtime_error("Unexpected token after identifier in line: " + std::to_string(context.getCurrentLine()));
         }
-        if (context.currentToken && context.currentToken->raw_val == "int" ) {
+        if (context.currentToken.raw_val == "int" ) {
             return ParseVariableDeclaration();
         }
         throw std::runtime_error("Unexpected statement in line: " + std::to_string(context.getCurrentLine()) + " at position: " + std::to_string(context.getCurrentPosition()));
@@ -65,12 +65,12 @@ public:
 
 private:
     std::unique_ptr<Statement> ParseVariableDeclaration() {
-        std::string type = context.currentToken->raw_val;
+        std::string type = context.currentToken.raw_val;
         context.advance();
-        std::string name = context.currentToken->raw_val;
+        std::string name = context.currentToken.raw_val;
         context.advance();
         std::optional<std::unique_ptr<Exp>> initializer = std::nullopt;
-        if (context.currentToken && context.currentToken->raw_val == "=") {
+        if (context.currentToken.raw_val == "=") {
             context.advance();
             initializer = expressionParser.ParseExpression();
         }
@@ -80,11 +80,11 @@ private:
 
     std::unique_ptr<Statement> ParseClassDef() {
         Expect("class");
-        std::string name = context.currentToken->raw_val;
+        std::string name = context.currentToken.raw_val;
         context.advance();
         Expect("{");
         std::vector<std::unique_ptr<Statement>> members;
-        while (context.currentToken && context.currentToken->raw_val != "}") {
+        while (context.currentToken.raw_val != "}") {
             members.push_back(ParseStatement());
         }
         Expect("}");
@@ -93,11 +93,11 @@ private:
 
     std::unique_ptr<Statement> ParseNamespaceDef() {
         Expect("namespace");
-        std::string name = context.currentToken->raw_val;
+        std::string name = context.currentToken.raw_val;
         context.advance();
         Expect("{");
         std::vector<std::unique_ptr<Statement>> statements;
-        while (context.currentToken && context.currentToken->raw_val != "}") {
+        while (context.currentToken.raw_val != "}") {
             statements.push_back(ParseStatement());
         }
         Expect("}");

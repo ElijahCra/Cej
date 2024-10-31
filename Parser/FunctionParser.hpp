@@ -14,19 +14,19 @@ class FunctionParser : public ParserBase {
 
   std::unique_ptr<FunctionDef>
   ParseFunction() {
-    std::string name = context.currentToken->raw_val;
+    std::string name = context.currentToken.raw_val;
     context.advance();
 
     Expect("::");
     Expect("(");
     Expect(")");
-    std::string returnType = context.currentToken->raw_val;
+    std::string returnType = context.currentToken.raw_val;
     context.advance();
     Expect("{");
 
     int allocationSize = 0;
     std::vector<std::unique_ptr<Statement>> statements;
-    while (context.currentToken && context.currentToken->raw_val != "}") {
+    while (context.currentToken.raw_val != "}") {
       auto statement = statementParser.ParseStatement();
       if (auto declare = dynamic_cast<Declare*>(statement.get())) {
         if (declare->type == "int") {

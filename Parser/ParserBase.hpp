@@ -19,8 +19,8 @@ class ParserBase {
     ParsingContext& context;
 
     void Expect(const std::string_view expected) {
-        if (!context.currentToken || context.currentToken->raw_val != expected) {
-            throw std::runtime_error("Expected '" + std::string(expected) + "', but got '" + (context.currentToken ? context.currentToken->raw_val : "<EOF>") + "' in line: " + std::to_string(context.getCurrentLine()) + " and position: " + std::to_string(context.getCurrentPosition())+'\n');
+        if (context.currentToken.raw_val != expected) {
+            throw std::runtime_error("Expected '" + std::string(expected) + "', but got '" + (context.currentToken.kind == TokenKind::TK_EOF ? context.currentToken.raw_val : "<EOF>") + "' in line: " + std::to_string(context.getCurrentLine()) + " and position: " + std::to_string(context.getCurrentPosition())+'\n');
         }
         context.advance();
     }

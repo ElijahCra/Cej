@@ -1,16 +1,16 @@
 // Created by Elijah on 8/13/2024.
 
-#include <format>
+
 #ifndef LEXER_CPP
 #define LEXER_CPP
 
+#include <format>
 #include <string>
 #include <string_view>
 #include <stdexcept>
 #include <array>
 #include <fstream>
 #include <iostream>
-#include <optional>
 #include "Token.hpp"
 
 
@@ -37,25 +37,7 @@ class Lexer {
   Lexer(const Lexer&) = delete;
   Lexer& operator=(const Lexer&) = delete;
 
-  std::optional<Token>
-  peekForDoubleColon() {
-    while (std::isspace(input.peek())) {
-      input.get();
-      positionCount += 1;
-    }
-    char first = 0;
-    char second = 0;
-    if (input.get(first)) {
-      second=static_cast<char>(input.peek());
-      input.putback(first);
-    }
-    if (first == ':' && second == ':') {
-      return Token{TokenKind::TK_COLONCOLON,"::"};
-    }
-    return std::nullopt;
-  }
-
-  std::optional<Token>
+  Token
   getNextToken() {
     char ch;
     while (input.get(ch)) {
@@ -111,7 +93,7 @@ class Lexer {
     if (input) {
       input.putback(ch);
     }
-    return {TokenKind::TK_INT, value};
+    return Token{TokenKind::TK_INT, value};
   }
 
   Token
@@ -125,35 +107,35 @@ class Lexer {
       input.putback(ch);
     }
     if (std::ranges::find(keyWords, value) != keyWords.end()) {
-      return {TokenKind::TK_KEYWORD, value};
+      return Token{TokenKind::TK_KEYWORD, value};
     }
-    return {TokenKind::TK_IDENTIFIER, value};
+    return Token{TokenKind::TK_IDENTIFIER, value};
   }
 
   Token
   makeTokenFromPunctuation(char firstChar) {
     using enum TokenKind;
     switch (firstChar) {
-      case '+': return {TK_PLUS, "+"};
-      case '-': return {TK_MINUS, "-"};
-      case '/': return {TK_SLASH, "/"};
-      case '*': return {TK_ASTERISK, "*"};
+      case '+': return Token{TK_PLUS, "+"};
+      case '-': return Token{TK_MINUS, "-"};
+      case '/': return Token{TK_SLASH, "/"};
+      case '*': return Token{TK_ASTERISK, "*"};
       case ':': {
         char next;
         if (input.get(next)) {
-          if (next == ':') return {TK_COLONCOLON, "::"};
-          if (next == '=') return {TK_COLONEQUAL, ":="};
+          if (next == ':') return Token{TK_COLONCOLON, "::"};
+          if (next == '=') return Token{TK_COLONEQUAL, ":="};
           input.putback(next);
         }
-        return {TK_COLON, ":"};
+        return Token{TK_COLON, ":"};
       }
-      case '=': return {TK_EQUAL, "="};
-      case ';': return {TK_SEMICOLON, ";"};
-      case '{': return {TK_OPEN_BRACE, "{"};
-      case '}': return {TK_CLOSE_BRACE, "}"};
-      case '(': return {TK_OPEN_PAREN, "("};
-      case ')': return {TK_CLOSE_PAREN, ")"};
-      case ',': return {TK_COMMA, ","};
+      case '=': return Token{TK_EQUAL, "="};
+      case ';': return Token{TK_SEMICOLON, ";"};
+      case '{': return Token{TK_OPEN_BRACE, "{"};
+      case '}': return Token{TK_CLOSE_BRACE, "}"};
+      case '(': return Token{TK_OPEN_PAREN, "("};
+      case ')': return Token{TK_CLOSE_PAREN, ")"};
+      case ',': return Token{TK_COMMA, ","};
       default: throw std::runtime_error("Invalid punctuation");
     }
   }

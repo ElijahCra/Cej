@@ -18,8 +18,8 @@ public:
 private:
     std::unique_ptr<Exp> ParseAdditiveExpression() {
         auto left = ParseMultiplicativeExpression();
-        while (context.currentToken && (context.currentToken->raw_val == "+" || context.currentToken->raw_val == "-")) {
-            BinaryOperator op = (context.currentToken->raw_val == "+") ? BinaryOperator::Add : BinaryOperator::Sub;
+        while ( (context.currentToken.raw_val == "+" || context.currentToken.raw_val == "-")) {
+            BinaryOperator op = (context.currentToken.raw_val == "+") ? BinaryOperator::Add : BinaryOperator::Sub;
             context.advance();
             auto right = ParseMultiplicativeExpression();
             left = std::make_unique<BinOp>(op, std::move(left), std::move(right));
@@ -29,8 +29,8 @@ private:
 
     std::unique_ptr<Exp> ParseMultiplicativeExpression() {
         auto left = ParseUnaryExpression();
-        while (context.currentToken && (context.currentToken->raw_val == "*" || context.currentToken->raw_val == "/")) {
-            BinaryOperator op = (context.currentToken->raw_val == "*") ? BinaryOperator::Mul : BinaryOperator::Div;
+        while (context.currentToken.raw_val == "*" || context.currentToken.raw_val == "/") {
+            BinaryOperator op = (context.currentToken.raw_val == "*") ? BinaryOperator::Mul : BinaryOperator::Div;
             context.advance();
             auto right = ParseUnaryExpression();
             left = std::make_unique<BinOp>(op, std::move(left), std::move(right));
@@ -39,7 +39,7 @@ private:
     }
 
     std::unique_ptr<Exp> ParseUnaryExpression() {
-        if (context.currentToken && context.currentToken->raw_val == "-") {
+        if (context.currentToken.raw_val == "-") {
             context.advance();
             auto operand = ParseUnaryExpression();
             return std::make_unique<UnOp>(UnaryOperator::Neg, std::move(operand));
@@ -48,25 +48,25 @@ private:
     }
 
     std::unique_ptr<Exp> ParsePrimaryExpression() {
-        if (context.currentToken && context.currentToken->kind == TokenKind::TK_INT) {
-            int value = std::stoi(context.currentToken->raw_val);
+        if (context.currentToken.kind == TokenKind::TK_INT) {
+            int value = std::stoi(context.currentToken.raw_val);
             context.advance();
             return std::make_unique<Literal>(value);
         }
-        if (context.currentToken && context.currentToken->kind == TokenKind::TK_IDENTIFIER) {
-            std::string name = context.currentToken->raw_val;
+        if (context.currentToken.kind == TokenKind::TK_IDENTIFIER) {
+            std::string name = context.currentToken.raw_val;
             context.advance();
-            if (context.currentToken && context.currentToken->raw_val == "(") {
+            if (context.currentToken.raw_val == "(") {
                 // Function call or object creation
                 return ParseFunctionOrObjectCreation(std::move(name));
             }
-            if (context.currentToken && context.currentToken->raw_val == ".") {
+            if (context.currentToken.raw_val == ".") {
                 // Member access
                 return ParseMemberAccess(std::make_unique<Var>(std::move(name)));
             }
             return std::make_unique<Var>(std::move(name));
         }
-        if (context.currentToken && context.currentToken->raw_val == "(") {
+        if (context.currentToken.raw_val == "(") {
             context.advance();
             auto exp = ParseExpression();
             Expect(")");
@@ -78,10 +78,10 @@ private:
     std::unique_ptr<Exp> ParseFunctionOrObjectCreation(std::string name) {
         Expect("(");
         std::vector<std::unique_ptr<Exp>> arguments;
-        if (context.currentToken && context.currentToken->raw_val != ")") {
+        if (context.currentToken.raw_val != ")") {
             do {
                 arguments.push_back(ParseExpression());
-            } while (context.currentToken && context.currentToken->raw_val == "," && (context.advance(), true));
+            } while (context.currentToken.raw_val == "," && (context.advance(), true));
         }
         Expect(")");
         if (IsTypeName(name)) {
@@ -95,7 +95,7 @@ private:
 
     std::unique_ptr<Exp> ParseMemberAccess(std::unique_ptr<Exp> object) {
         Expect(".");
-        std::string memberName = context.currentToken->raw_val;
+        std::string memberName = context.currentToken.raw_val;
         context.advance();
         return std::make_unique<MemberAccess>(std::move(object), std::move(memberName));
     }

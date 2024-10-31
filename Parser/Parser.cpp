@@ -17,7 +17,7 @@ class Parser {
 
   std::unique_ptr<CompilationUnit> parseUnit() {
     std::vector<std::unique_ptr<Statement>> statements;
-    while (context.currentToken && context.currentToken->kind != TokenKind::TK_EOF) {
+    while (context.currentToken.kind != TokenKind::TK_EOF) {
       if (IsFunctionDefinition()) {
         statements.push_back(functionParser.ParseFunction());
       } else {
@@ -33,7 +33,22 @@ class Parser {
   FunctionParser functionParser;
 
   bool IsFunctionDefinition() {
-    return context.currentToken && context.currentToken->kind == TokenKind::TK_IDENTIFIER && context.checkForDoubleColon().has_value();
+    if (context.currentToken.kind != TokenKind::TK_IDENTIFIER || context.addNextTokenToDequeue().kind != TokenKind::TK_COLONCOLON) {
+      return false;
+    }
+    if (context.addNextTokenToDequeue().raw_val == "static") {
+      return true;
+    }
+    if (context.getLastTokenFromQueue().kind != TokenKind::TK_OPEN_PAREN) {
+      return false;
+    }
+    if (context.addNextTokenToDequeue().kind == TokenKind::TK_CLOSE_PAREN) {
+      return true;
+    }
+    if (context.addNextTokenToDequeue().kind == TokenKind::TK_IDENTIFIER && context.addNextTokenToDequeue().kind == TokenKind::TK_COLON) {
+      return true;
+    }
+    return false;
   }
 
 };
