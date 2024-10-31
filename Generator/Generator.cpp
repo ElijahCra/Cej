@@ -2,14 +2,33 @@
 // Created by Elijah on 8/13/2024.
 //
 
+#include <sys/stat.h>
 #ifndef GENERATOR_CPP
 #define GENERATOR_CPP
 
 #include <sstream>
 #include <unordered_map>
-#include "Parser/Parser.cpp"
+#include "../Parser/Parser.cpp"
 
 class Generator {
+    public:
+    static std::string
+    GenerateAssembly(const std::unique_ptr<CompilationUnit>& program) {
+        assembly.str("");
+        assembly.clear();
+        EmitLine("\t.globl _main");
+        EmitLine("\t.align 4");
+
+        for (auto& statement : program->statements) {
+            if (dynamic_cast<FunctionDef*>(statement.get())) {
+                GenerateFunction(std::unique_ptr<FunctionDef>(dynamic_cast<FunctionDef *>(statement.release())));
+            } else {
+                GenerateStatement(statement);
+            }
+        }
+        return assembly.str();
+    }
+    private:
     inline static std::stringstream assembly;
     inline static std::unordered_map<std::string, std::unordered_map<std::string, int>> functionVariables;
     inline static int stackSize;
@@ -18,7 +37,7 @@ class Generator {
 
     static void
     EmitLine(const std::string& line) {
-        std::cout << line << "\n";
+        assembly << line << "\n";
     }
 
     static void
@@ -127,7 +146,7 @@ class Generator {
     }
 
     static void
-    GenerateFunction(const std::unique_ptr<Function>& func) {
+    GenerateFunction(const std::unique_ptr<FunctionDef>& func) {
         currentFunction = func->name;
         functionVariables[currentFunction].clear();
         stackSize = 0;
@@ -159,20 +178,6 @@ class Generator {
         } else {
             EmitLine("\tret");
         }
-    }
-
-public:
-    static std::string
-    GenerateAssembly(const std::unique_ptr<Program>& program) {
-        assembly.str("");
-        assembly.clear();
-        EmitLine("\t.globl _main");
-        EmitLine("\t.align 4");
-
-        for (const auto& func : program->functions) {
-            GenerateFunction(func);
-        }
-        return assembly.str();
     }
 };
 
