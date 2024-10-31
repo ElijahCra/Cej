@@ -7,12 +7,11 @@ g :: () int {
     return f()+(2*var);
 }
 
-h:int = 1;
 main :: () int {
     a:int=1;
     b:int=f();
     c:int=3;
     d:int=49;
     d=39;
-    return (a+b)*(f()+g())+d+h;
+    return (a+b)*(f()+g())+d;
 }
