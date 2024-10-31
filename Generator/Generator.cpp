@@ -11,6 +11,24 @@
 #include "../Parser/Parser.cpp"
 
 class Generator {
+    public:
+    static std::string
+    GenerateAssembly(const std::unique_ptr<CompilationUnit>& program) {
+        assembly.str("");
+        assembly.clear();
+        EmitLine("\t.globl _main");
+        EmitLine("\t.align 4");
+
+        for (auto& statement : program->statements) {
+            if (dynamic_cast<FunctionDef*>(statement.get())) {
+                GenerateFunction(std::unique_ptr<FunctionDef>(dynamic_cast<FunctionDef *>(statement.release())));
+            } else {
+                GenerateStatement(statement);
+            }
+        }
+        return assembly.str();
+    }
+    private:
     inline static std::stringstream assembly;
     inline static std::unordered_map<std::string, std::unordered_map<std::string, int>> functionVariables;
     inline static int stackSize;
@@ -160,24 +178,6 @@ class Generator {
         } else {
             EmitLine("\tret");
         }
-    }
-
-public:
-    static std::string
-    GenerateAssembly(const std::unique_ptr<CompilationUnit>& program) {
-        assembly.str("");
-        assembly.clear();
-        EmitLine("\t.globl _main");
-        EmitLine("\t.align 4");
-
-        for (auto& statement : program->statements) {
-            if (dynamic_cast<FunctionDef*>(statement.get())) {
-                GenerateFunction(std::unique_ptr<FunctionDef>(dynamic_cast<FunctionDef *>(statement.release())));
-            } else {
-                GenerateStatement(statement);
-            }
-        }
-        return assembly.str();
     }
 };
 

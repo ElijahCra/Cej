@@ -47,13 +47,19 @@ public:
                     Expect(";");
                     return std::make_unique<Declare>(std::move(name), std::move(type));
                 }
-                throw std::runtime_error("Provided type not in system types in line: " + context.getCurrentLine());
+                throw std::runtime_error("Provided type not in system types in line: " + std::to_string(context.getCurrentLine()));
             }
+            if (context.currentToken && context.currentToken->raw_val == "=") {
+                context.advance();
+                auto exp = expressionParser.ParseExpression();
+                Expect(";");
+                return std::make_unique<ExpStatement>(std::make_unique<Assign>(std::move(name), std::move(exp)));
+            }
+            throw std::runtime_error("Unexpected token after identifier in line: " + std::to_string(context.getCurrentLine()));
         }
         if (context.currentToken && context.currentToken->raw_val == "int" ) {
             return ParseVariableDeclaration();
         }
-
         throw std::runtime_error("Unexpected statement in line: " + std::to_string(context.getCurrentLine()) + " at position: " + std::to_string(context.getCurrentPosition()));
     }
 

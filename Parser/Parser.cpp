@@ -33,8 +33,6 @@ class Parser {
   FunctionParser functionParser;
 
   bool IsFunctionDefinition() {
-    // Implement logic to determine if the current token sequence represents a function definition
-    // For simplicity, let's assume if we see an identifier followed by '::', it's a function
     return context.currentToken && context.currentToken->kind == TokenKind::TK_IDENTIFIER && context.checkForDoubleColon().has_value();
   }
 
