@@ -19,11 +19,11 @@ class Generator {
         EmitLine("\t.globl _main");
         EmitLine("\t.align 4");
 
-        for (auto& statement : program->statements) {
-            if (dynamic_cast<FunctionDef*>(statement.get())) {
-                GenerateFunction(std::unique_ptr<FunctionDef>(dynamic_cast<FunctionDef *>(statement.release())));
+        for (auto& node : program->nodes) {
+            if (dynamic_cast<FunctionDef*>(node.get())) {
+                GenerateFunction(std::unique_ptr<FunctionDef>(dynamic_cast<FunctionDef *>(node.release())));
             } else {
-                GenerateStatement(statement);
+                GenerateStatement(std::unique_ptr<Statement>(dynamic_cast<Statement *>(node.release())));
             }
         }
         return assembly.str();

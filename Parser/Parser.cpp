@@ -16,15 +16,15 @@ class Parser {
   explicit Parser(Lexer& lexer) : context(lexer), statementParser(context), functionParser(context) {}
 
   std::unique_ptr<CompilationUnit> parseUnit() {
-    std::vector<std::unique_ptr<Statement>> statements;
+    std::vector<std::unique_ptr<ASTNode>> nodes;
     while (context.currentToken.kind != TokenKind::TK_EOF) {
       if (IsFunctionDefinition()) {
-        statements.push_back(functionParser.ParseFunction());
+        nodes.push_back(functionParser.ParseFunction());
       } else {
-        statements.push_back(statementParser.ParseStatement());
+        nodes.push_back(statementParser.ParseStatement());
       }
     }
-    return std::make_unique<CompilationUnit>(std::move(statements));
+    return std::make_unique<CompilationUnit>(std::move(nodes));
   }
 
   private:

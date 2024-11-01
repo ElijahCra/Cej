@@ -22,12 +22,12 @@ struct Statement : ASTNode {};
 
 // Program Node
 struct CompilationUnit : ASTNode {
-    std::vector<std::unique_ptr<Statement>> statements;
-    explicit CompilationUnit(std::vector<std::unique_ptr<Statement>> s) : statements(std::move(s)) {}
+    std::vector<std::unique_ptr<ASTNode>> nodes;
+    explicit CompilationUnit(std::vector<std::unique_ptr<ASTNode>> n) : nodes(std::move(n)) {}
 };
 
 // Function Node
-struct FunctionDef : Statement {
+struct FunctionDef : ASTNode {
     std::string name;
     int allocationSize;
     std::string returnType;
