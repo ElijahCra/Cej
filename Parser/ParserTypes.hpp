@@ -75,6 +75,7 @@ struct StructType : Type {
 
 // Storage Class
 enum class StorageClass {
+    None,
     Static,
     Extern
 };
@@ -97,8 +98,8 @@ struct VariableDeclaration : Declaration {
     std::string name;
     std::unique_ptr<Type> varType;
     std::optional<std::unique_ptr<Initializer>> initializer;
-    std::optional<StorageClass> storageClass;
-    VariableDeclaration(std::string n, std::unique_ptr<Type> t, std::optional<std::unique_ptr<Initializer>> init = std::nullopt, std::optional<StorageClass> sc = std::nullopt)
+    StorageClass storageClass;
+    VariableDeclaration(std::string n, std::unique_ptr<Type> t, std::optional<std::unique_ptr<Initializer>> init = std::nullopt, StorageClass sc = StorageClass::None)
         : name(std::move(n)), varType(std::move(t)), initializer(std::move(init)), storageClass(sc) {}
 };
 
@@ -134,8 +135,8 @@ struct FunctionDeclaration : Declaration {
     std::vector<std::unique_ptr<Parameter>> parameters;
     std::optional<std::unique_ptr<Block>> body;
     std::unique_ptr<Type> funType;
-    std::optional<StorageClass> storageClass;
-    FunctionDeclaration(std::string n, std::vector<std::unique_ptr<Parameter>> params, std::optional<std::unique_ptr<Block>> b, std::unique_ptr<Type> ft, std::optional<StorageClass> sc = std::nullopt)
+    StorageClass storageClass;
+    FunctionDeclaration(std::string n, std::vector<std::unique_ptr<Parameter>> params, std::optional<std::unique_ptr<Block>> b, std::unique_ptr<Type> ft, StorageClass sc = StorageClass::None)
         : name(std::move(n)), parameters(std::move(params)), body(std::move(b)), funType(std::move(ft)), storageClass(sc) {}
 };
 
@@ -155,9 +156,7 @@ struct StructDeclaration : Declaration {
 };
 
 // For Initialization
-struct ForInit {
-    virtual ~ForInit() = default;
-};
+struct ForInit : ASTNode {};
 
 struct InitDecl : ForInit {
     std::unique_ptr<VariableDeclaration> declaration;

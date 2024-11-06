@@ -1,7 +1,3 @@
-//
-// Created by Elijah on 10/29/2024.
-//
-
 #ifndef EXPRESSIONPARSER_HPP
 #define EXPRESSIONPARSER_HPP
 
@@ -10,101 +6,236 @@
 
 class ExpressionParser : public ParserBase {
 public:
-    std::unique_ptr<Exp> ParseExpression() {
-        return ParseAdditiveExpression();
-    }
     explicit ExpressionParser(ParsingContext& context) : ParserBase(context) {}
 
+    std::unique_ptr<Exp> parseExpression() {
+        return parseAssignmentExpression();
+    }
+
 private:
-    std::unique_ptr<Exp> ParseAdditiveExpression() {
-        auto left = ParseMultiplicativeExpression();
-        while ( (context.currentToken.raw_val == "+" || context.currentToken.raw_val == "-")) {
-            BinaryOperator op = (context.currentToken.raw_val == "+") ? BinaryOperator::Add : BinaryOperator::Sub;
+    std::unique_ptr<Exp> parseAssignmentExpression() {
+        auto lhs = parseConditionalExpression();
+        if (context.currentToken.raw_val == "=") {
             context.advance();
-            auto right = ParseMultiplicativeExpression();
-            left = std::make_unique<BinOp>(op, std::move(left), std::move(right));
+            auto rhs = parseAssignmentExpression();
+            return std::make_unique<Assignment>(std::move(lhs), std::move(rhs));
+        } else {
+            return lhs;
         }
-        return left;
     }
 
-    std::unique_ptr<Exp> ParseMultiplicativeExpression() {
-        auto left = ParseUnaryExpression();
-        while (context.currentToken.raw_val == "*" || context.currentToken.raw_val == "/") {
-            BinaryOperator op = (context.currentToken.raw_val == "*") ? BinaryOperator::Mul : BinaryOperator::Div;
+    std::unique_ptr<Exp> parseConditionalExpression() {
+        auto condition = parseLogicalOrExpression();
+        if (context.currentToken.raw_val == "?") {
             context.advance();
-            auto right = ParseUnaryExpression();
-            left = std::make_unique<BinOp>(op, std::move(left), std::move(right));
+            auto trueExp = parseExpression();
+            Expect(":");
+            auto falseExp = parseConditionalExpression();
+            return std::make_unique<Conditional>(std::move(condition), std::move(trueExp), std::move(falseExp));
+        } else {
+            return condition;
         }
-        return left;
     }
 
-    std::unique_ptr<Exp> ParseUnaryExpression() {
-        if (context.currentToken.raw_val == "-") {
+    std::unique_ptr<Exp> parseLogicalOrExpression() {
+        auto lhs = parseLogicalAndExpression();
+        while (context.currentToken.raw_val == "||") {
             context.advance();
-            auto operand = ParseUnaryExpression();
-            return std::make_unique<UnOp>(UnaryOperator::Neg, std::move(operand));
+            auto rhs = parseLogicalAndExpression();
+            lhs = std::make_unique<BinOp>(BinaryOperator::Or, std::move(lhs), std::move(rhs));
         }
-        return ParsePrimaryExpression();
+        return lhs;
     }
 
-    std::unique_ptr<Exp> ParsePrimaryExpression() {
-        if (context.currentToken.kind == TokenKind::TK_INT) {
-            int value = std::stoi(context.currentToken.raw_val);
+    std::unique_ptr<Exp> parseLogicalAndExpression() {
+        auto lhs = parseEqualityExpression();
+        while (context.currentToken.raw_val == "&&") {
             context.advance();
-            return std::make_unique<Literal>(value);
+            auto rhs = parseEqualityExpression();
+            lhs = std::make_unique<BinOp>(BinaryOperator::And, std::move(lhs), std::move(rhs));
         }
-        if (context.currentToken.kind == TokenKind::TK_IDENTIFIER) {
+        return lhs;
+    }
+
+    std::unique_ptr<Exp> parseEqualityExpression() {
+        auto lhs = parseRelationalExpression();
+        while (context.currentToken.raw_val == "==" || context.currentToken.raw_val == "!=") {
+            BinaryOperator op = (context.currentToken.raw_val == "==") ? BinaryOperator::Equal : BinaryOperator::NotEqual;
+            context.advance();
+            auto rhs = parseRelationalExpression();
+            lhs = std::make_unique<BinOp>(op, std::move(lhs), std::move(rhs));
+        }
+        return lhs;
+    }
+
+    std::unique_ptr<Exp> parseRelationalExpression() {
+        auto lhs = parseAdditiveExpression();
+        while (context.currentToken.raw_val == "<" || context.currentToken.raw_val == ">" ||
+               context.currentToken.raw_val == "<=" || context.currentToken.raw_val == ">=") {
+            BinaryOperator op;
+            if (context.currentToken.raw_val == "<") op = BinaryOperator::LessThan;
+            else if (context.currentToken.raw_val == ">") op = BinaryOperator::GreaterThan;
+            else if (context.currentToken.raw_val == "<=") op = BinaryOperator::LessOrEqual;
+            else op = BinaryOperator::GreaterOrEqual;
+
+            context.advance();
+            auto rhs = parseAdditiveExpression();
+            lhs = std::make_unique<BinOp>(op, std::move(lhs), std::move(rhs));
+        }
+        return lhs;
+    }
+
+    std::unique_ptr<Exp> parseAdditiveExpression() {
+        auto lhs = parseMultiplicativeExpression();
+        while (context.currentToken.raw_val == "+" || context.currentToken.raw_val == "-") {
+            BinaryOperator op = (context.currentToken.raw_val == "+") ? BinaryOperator::Add : BinaryOperator::Subtract;
+            context.advance();
+            auto rhs = parseMultiplicativeExpression();
+            lhs = std::make_unique<BinOp>(op, std::move(lhs), std::move(rhs));
+        }
+        return lhs;
+    }
+
+    std::unique_ptr<Exp> parseMultiplicativeExpression() {
+        auto lhs = parseUnaryExpression();
+        while (context.currentToken.raw_val == "*" || context.currentToken.raw_val == "/" || context.currentToken.raw_val == "%") {
+            BinaryOperator op;
+            if (context.currentToken.raw_val == "*") op = BinaryOperator::Multiply;
+            else if (context.currentToken.raw_val == "/") op = BinaryOperator::Divide;
+            else op = BinaryOperator::Remainder;
+
+            context.advance();
+            auto rhs = parseUnaryExpression();
+            lhs = std::make_unique<BinOp>(op, std::move(lhs), std::move(rhs));
+        }
+        return lhs;
+    }
+
+    std::unique_ptr<Exp> parseUnaryExpression() {
+        if (context.currentToken.raw_val == "+" || context.currentToken.raw_val == "-" ||
+            context.currentToken.raw_val == "~" || context.currentToken.raw_val == "!") {
+            UnaryOperator op;
+            if (context.currentToken.raw_val == "+") {
+                context.advance();
+                return parseUnaryExpression();
+            } else if (context.currentToken.raw_val == "-") {
+                op = UnaryOperator::Negate;
+            } else if (context.currentToken.raw_val == "~") {
+                op = UnaryOperator::Complement;
+            } else {
+                op = UnaryOperator::Not;
+            }
+            context.advance();
+            auto operand = parseUnaryExpression();
+            return std::make_unique<UnOp>(op, std::move(operand));
+        } else if (context.currentToken.raw_val == "(") {
+            size_t savedPosition = context.getCurrentPosition();
+            auto savedToken = context.currentToken;
+
+            context.advance();
+            auto type = typeParser.parseType();
+            if (type && context.currentToken.raw_val == ")") {
+                context.advance();
+                auto operand = parseUnaryExpression();
+                return std::make_unique<Cast>(std::move(type), std::move(operand));
+            } else {
+                context.setPosition(savedPosition);
+                context.currentToken = savedToken;
+            }
+        }
+        return parsePostfixExpression();
+    }
+
+    std::unique_ptr<Exp> parsePostfixExpression() {
+        auto expr = parsePrimaryExpression();
+        while (true) {
+            if (context.currentToken.raw_val == "[") {
+                context.advance();
+                auto index = parseExpression();
+                Expect("]");
+                expr = std::make_unique<Subscript>(std::move(expr), std::move(index));
+            } else if (context.currentToken.raw_val == "(") {
+                expr = parseFunctionCall(std::move(expr));
+            } else if (context.currentToken.raw_val == ".") {
+                context.advance();
+                if (context.currentToken.kind != TokenKind::TK_IDENTIFIER) {
+                    throw std::runtime_error("Expected identifier after '.' at line: " + std::to_string(context.getCurrentLine()));
+                }
+                std::string member = context.currentToken.raw_val;
+                context.advance();
+                expr = std::make_unique<Dot>(std::move(expr), std::move(member));
+            } else if (context.currentToken.raw_val == "->") {
+                context.advance();
+                if (context.currentToken.kind != TokenKind::TK_IDENTIFIER) {
+                    throw std::runtime_error("Expected identifier after '->' at line: " + std::to_string(context.getCurrentLine()));
+                }
+                std::string member = context.currentToken.raw_val;
+                context.advance();
+                expr = std::make_unique<Arrow>(std::move(expr), std::move(member));
+            } else {
+                break;
+            }
+        }
+        return expr;
+    }
+
+    std::unique_ptr<Exp> parsePrimaryExpression() {
+        if (context.currentToken.kind == TokenKind::TK_INT ||
+            context.currentToken.kind == TokenKind::TK_CHAR ||
+            context.currentToken.kind == TokenKind::TK_DOUBLE) {
+            auto constant = parseConstant();
+            return std::move(constant);
+        } else if (context.currentToken.kind == TokenKind::TK_STRING) {
+            std::string value = context.currentToken.raw_val;
+            context.advance();
+            return std::make_unique<StringLiteral>(std::move(value));
+        } else if (context.currentToken.kind == TokenKind::TK_IDENTIFIER) {
             std::string name = context.currentToken.raw_val;
             context.advance();
-            if (context.currentToken.raw_val == "(") {
-                // Function call or object creation
-                return ParseFunctionOrObjectCreation(std::move(name));
-            }
-            if (context.currentToken.raw_val == ".") {
-                // Member access
-                return ParseMemberAccess(std::make_unique<Var>(std::move(name)));
-            }
             return std::make_unique<Var>(std::move(name));
-        }
-        if (context.currentToken.raw_val == "(") {
+        } else if (context.currentToken.raw_val == "(") {
             context.advance();
-            auto exp = ParseExpression();
+            auto expr = parseExpression();
             Expect(")");
-            return exp;
+            return expr;
+        } else {
+            throw std::runtime_error("Unexpected token in primary expression at line: " + std::to_string(context.getCurrentLine()));
         }
-        throw std::runtime_error("Unexpected token in primary expression in line: " + std::to_string(context.getCurrentLine()));
     }
 
-    std::unique_ptr<Exp> ParseFunctionOrObjectCreation(std::string name) {
+    std::unique_ptr<Exp> parseFunctionCall(std::unique_ptr<Exp> func) {
         Expect("(");
         std::vector<std::unique_ptr<Exp>> arguments;
         if (context.currentToken.raw_val != ")") {
             do {
-                arguments.push_back(ParseExpression());
+                arguments.push_back(parseAssignmentExpression());
             } while (context.currentToken.raw_val == "," && (context.advance(), true));
         }
         Expect(")");
-        if (IsTypeName(name)) {
-            // Object creation
-            return std::make_unique<ObjectCreation>(std::move(name), std::move(arguments));
+        if (auto var = dynamic_cast<Var*>(func.get())) {
+            return std::make_unique<FunctionCall>(std::move(var->name), std::move(arguments));
         } else {
-            // Function call
-            return std::make_unique<FunctionCall>(std::move(name), std::move(arguments));
+            throw std::runtime_error("Function calls on expressions not supported yet at line: " + std::to_string(context.getCurrentLine()));
         }
     }
 
-    std::unique_ptr<Exp> ParseMemberAccess(std::unique_ptr<Exp> object) {
-        Expect(".");
-        std::string memberName = context.currentToken.raw_val;
-        context.advance();
-        return std::make_unique<MemberAccess>(std::move(object), std::move(memberName));
-    }
-
-    static bool IsTypeName(const std::string& name) {
-        // Implement logic to check if 'name' is a type name (e.g., class or built-in type)
-        // For simplicity, let's assume any name starting with a capital letter is a type
-        return !name.empty() && std::isupper(name[0]);
+    std::unique_ptr<Exp> parseConstant() {
+        if (context.currentToken.kind == TokenKind::TK_INT) {
+            int value = std::stoi(context.currentToken.raw_val);
+            context.advance();
+            return std::make_unique<Constant>(value);
+        } else if (context.currentToken.kind == TokenKind::TK_CHAR) {
+            char value = context.currentToken.raw_val[0];
+            context.advance();
+            return std::make_unique<Constant>(value);
+        } else if (context.currentToken.kind == TokenKind::TK_DOUBLE) {
+            double value = std::stod(context.currentToken.raw_val);
+            context.advance();
+            return std::make_unique<Constant>(value);
+        } else {
+            throw std::runtime_error("Unknown constant type at line: " + std::to_string(context.getCurrentLine()));
+        }
     }
 };
 
-#endif //EXPRESSIONPARSER_HPP
+#endif // EXPRESSIONPARSER_HPP

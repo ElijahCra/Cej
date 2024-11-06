@@ -7,50 +7,30 @@
 #include <vector>
 #include "../Lexer/Lexer.cpp"
 #include "ParserTypes.hpp"
-#include "StatementParser.hpp"
-#include "FunctionParser.hpp"
+#include "DeclarationParser.cpp"
 #include "ParsingContext.hpp"
 
 class Parser {
   public:
-  explicit Parser(Lexer& lexer) : context(lexer), statementParser(context), functionParser(context) {}
+  explicit Parser(Lexer& lexer)
+      : context(lexer), declarationParser(context) {}
 
-  std::unique_ptr<CompilationUnit> parseUnit() {
-    std::vector<std::unique_ptr<ASTNode>> nodes;
+  std::unique_ptr<Program> parseProgram() {
+    std::vector<std::unique_ptr<Declaration>> declarations;
     while (context.currentToken.kind != TokenKind::TK_EOF) {
-      if (IsFunctionDefinition()) {
-        nodes.push_back(functionParser.ParseFunction());
+      auto decl = declarationParser.parseDeclaration();
+      if (decl) {
+        declarations.push_back(std::move(decl));
       } else {
-        nodes.push_back(statementParser.ParseStatement());
+        throw std::runtime_error("Failed to parse declaration at line: " + std::to_string(context.getCurrentLine()));
       }
     }
-    return std::make_unique<CompilationUnit>(std::move(nodes));
+    return std::make_unique<Program>(std::move(declarations));
   }
 
   private:
   ParsingContext context;
-  StatementParser statementParser;
-  FunctionParser functionParser;
-
-  bool IsFunctionDefinition() {
-    if (context.currentToken.kind != TokenKind::TK_IDENTIFIER || context.addNextTokenToDequeue().kind != TokenKind::TK_COLONCOLON) {
-      return false;
-    }
-    if (context.addNextTokenToDequeue().raw_val == "static") {
-      return true;
-    }
-    if (context.getLastTokenFromQueue().kind != TokenKind::TK_OPEN_PAREN) {
-      return false;
-    }
-    if (context.addNextTokenToDequeue().kind == TokenKind::TK_CLOSE_PAREN) {
-      return true;
-    }
-    if (context.addNextTokenToDequeue().kind == TokenKind::TK_IDENTIFIER && context.addNextTokenToDequeue().kind == TokenKind::TK_COLON) {
-      return true;
-    }
-    return false;
-  }
-
+  DeclarationParser declarationParser;
 };
 
 #endif // PARSER_CPP
