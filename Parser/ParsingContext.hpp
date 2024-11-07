@@ -6,7 +6,6 @@
 #define PARSINGCONTEXT_HPP
 
 #include <deque>
-
 #include "../Lexer/Lexer.cpp"
 
 struct ParsingContext {
@@ -15,7 +14,7 @@ struct ParsingContext {
   Token currentToken;
 
   explicit ParsingContext(Lexer& lexer) : lexer(lexer) {
-    currentToken= lexer.getNextToken();
+    currentToken = lexer.getNextToken();
   }
 
   void
@@ -29,7 +28,7 @@ struct ParsingContext {
   }
 
   [[nodiscard]] Token
-  addNextTokenToDequeue() {
+  peekNextToken() {
     tokenQueue.emplace_back(lexer.getNextToken());
     return tokenQueue.back();
   }

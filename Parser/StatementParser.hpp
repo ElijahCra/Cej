@@ -12,97 +12,158 @@
 class StatementParser : public ParserBase {
     ExpressionParser expressionParser;
 public:
-    explicit StatementParser(ParsingContext& context) : ParserBase(context), expressionParser(context) {
-    }
+    explicit StatementParser(ParsingContext& context) : ParserBase(context), expressionParser(context) {}
 
     std::unique_ptr<Statement> ParseStatement() {
         if (context.currentToken.raw_val == "return") {
             context.advance();
-            auto exp = expressionParser.ParseExpression();
+            std::optional<std::unique_ptr<Exp>> exp = std::nullopt;
+            if (context.currentToken.raw_val != ";") {
+                exp = expressionParser.ParseExpression();
+            }
             Expect(";");
-            return std::make_unique<Return>(std::move(exp));
+            return std::make_unique<ReturnStatement>(std::move(exp));
         }
-        if (context.currentToken.raw_val == "class") {
-            return ParseClassDef();
+        if (context.currentToken.raw_val == "{") {
+            return std::make_unique<CompoundStatement>(ParseBlock());
         }
-        if (context.currentToken.raw_val == "namespace") {
-            return ParseNamespaceDef();
+        if (context.currentToken.raw_val == "if") {
+            return ParseIfStatement();
         }
-        if (context.currentToken.kind == TokenKind::TK_IDENTIFIER) {
-            std::string name = context.currentToken.raw_val;
+        if (context.currentToken.raw_val == "while") {
+            return ParseWhileStatement();
+        }
+        if (context.currentToken.raw_val == "for") {
+            return ParseForStatement();
+        }
+        if (IsDeclaration()) {
+            auto declaration = ParseVariableDeclaration();
+            return std::make_unique<BlockItemDeclaration>(std::move(declaration));
+        }
+        // Expression statement
+        auto exp = expressionParser.ParseExpression();
+        Expect(";");
+        return std::make_unique<ExpressionStatement>(std::move(exp));
+    }
+
+    std::unique_ptr<Declaration> ParseVariableDeclaration() {
+        auto varType = ParseType();
+        std::string name = context.currentToken.raw_val;
+        context.advance();
+        std::optional<std::unique_ptr<Initializer>> initializer = std::nullopt;
+
+        if (context.currentToken.raw_val == "=") {
+            context.advance();
+            auto exp = expressionParser.ParseExpression();
+            initializer = std::make_unique<SingleInit>(std::move(exp));
+        }
+
+        Expect(";");
+
+        return std::make_unique<VariableDeclaration>(std::move(name), std::move(varType), std::move(initializer));
+    }
+
+  std::unique_ptr<Block>
+  ParseBlock() {
+    Expect("{");
+    std::vector<std::unique_ptr<BlockItem>> items;
+    while (context.currentToken.raw_val != "}") {
+      if (IsDeclaration()) {
+        auto declaration = ParseVariableDeclaration();
+        items.push_back(std::make_unique<BlockItemDeclaration>(std::move(declaration)));
+      } else {
+        auto statement = ParseStatement();
+        items.push_back(std::make_unique<BlockItemStatement>(std::move(statement)));
+      }
+    }
+    Expect("}");
+    return std::make_unique<Block>(std::move(items));
+  }
+
+    std::unique_ptr<Declaration> ParseStructDeclaration() {
+        Expect("struct");
+        std::string tag = context.currentToken.raw_val;
+        context.advance();
+        Expect("{");
+        std::vector<std::unique_ptr<MemberDeclaration>> members;
+        while (context.currentToken.raw_val != "}") {
+            auto member = ParseMemberDeclaration();
+            members.push_back(std::move(member));
+        }
+        Expect("}");
+        Expect(";");
+        return std::make_unique<StructDeclaration>(std::move(tag), std::move(members));
+    }
+
+    std::unique_ptr<Type> ParseType() {
+        if (IsPrimitiveType(context.currentToken.raw_val)) {
+            PrimitiveType primType = StringToPrimitiveType(context.currentToken.raw_val);
             context.advance();
 
-            if (context.currentToken.raw_val == ":") {
-                context.advance();
-                if (context.currentToken.raw_val == "int") {
-                    std::string type = context.currentToken.raw_val;
-                    context.advance();
+            std::unique_ptr<Type> typeNode = std::make_unique<PrimitiveTypeNode>(primType);
 
-                    if (context.currentToken.raw_val == "=") {
-                        context.advance();
-                        auto initializer = expressionParser.ParseExpression();
-                        Expect(";");
-                        return std::make_unique<Declare>(std::move(name), std::move(type), std::move(initializer));
-                    }
-                    Expect(";");
-                    return std::make_unique<Declare>(std::move(name), std::move(type));
-                }
-                throw std::runtime_error("Provided type not in system types in line: " + std::to_string(context.getCurrentLine()));
-            }
-            if (context.currentToken.raw_val == "=") {
+            while (context.currentToken.raw_val == "*") {
                 context.advance();
-                auto exp = expressionParser.ParseExpression();
-                Expect(";");
-                return std::make_unique<ExpStatement>(std::make_unique<Assign>(std::move(name), std::move(exp)));
+                typeNode = std::make_unique<PointerType>(std::move(typeNode));
             }
-            throw std::runtime_error("Unexpected token after identifier in line: " + std::to_string(context.getCurrentLine()));
+
+            return typeNode;
         }
-        if (context.currentToken.raw_val == "int" ) {
-            return ParseVariableDeclaration();
+        if (context.currentToken.raw_val == "struct") {
+            context.advance();
+            std::string tag = context.currentToken.raw_val;
+            context.advance();
+            auto typeNode = std::make_unique<StructType>(std::move(tag));
+
+            while (context.currentToken.raw_val == "*") {
+                context.advance();
+                typeNode = std::make_unique<PointerType>(std::move(typeNode));
+            }
+
+            return typeNode;
         }
-        throw std::runtime_error("Unexpected statement in line: " + std::to_string(context.getCurrentLine()) + " at position: " + std::to_string(context.getCurrentPosition()));
+        throw std::runtime_error("Unknown type at line: " + std::to_string(context.getCurrentLine()));
+    }
+
+    bool IsTypeName(const std::string& name) {
+        return IsPrimitiveType(name) || name == "struct";
     }
 
 private:
-    std::unique_ptr<Statement> ParseVariableDeclaration() {
-        std::string type = context.currentToken.raw_val;
+    bool IsPrimitiveType(const std::string& typeName) {
+        static const std::set<std::string> primitiveTypes = {
+            "char", "signed", "unsigned", "int", "long", "double", "void", "float"
+        };
+        return primitiveTypes.count(typeName) > 0;
+    }
+
+    PrimitiveType StringToPrimitiveType(const std::string& typeName) {
+        if (typeName == "char") return PrimitiveType::Char;
+        if (typeName == "signed") return PrimitiveType::SChar;
+        if (typeName == "unsigned") return PrimitiveType::UChar;
+        if (typeName == "int") return PrimitiveType::Int;
+        if (typeName == "long") return PrimitiveType::Long;
+        if (typeName == "double") return PrimitiveType::Double;
+        if (typeName == "void") return PrimitiveType::Void;
+        throw std::runtime_error("Unknown primitive type: " + typeName);
+    }
+
+    std::unique_ptr<MemberDeclaration> ParseMemberDeclaration() {
+        auto memberType = ParseType();
+        std::string memberName = context.currentToken.raw_val;
         context.advance();
-        std::string name = context.currentToken.raw_val;
-        context.advance();
-        std::optional<std::unique_ptr<Exp>> initializer = std::nullopt;
-        if (context.currentToken.raw_val == "=") {
-            context.advance();
-            initializer = expressionParser.ParseExpression();
-        }
         Expect(";");
-        return std::make_unique<Declare>(std::move(name), std::move(type), std::move(initializer));
+        return std::make_unique<MemberDeclaration>(std::move(memberName), std::move(memberType));
     }
 
-    std::unique_ptr<Statement> ParseClassDef() {
-        Expect("class");
-        std::string name = context.currentToken.raw_val;
-        context.advance();
-        Expect("{");
-        std::vector<std::unique_ptr<Statement>> members;
-        while (context.currentToken.raw_val != "}") {
-            members.push_back(ParseStatement());
-        }
-        Expect("}");
-        return std::make_unique<ClassDef>(std::move(name), std::move(members));
+    bool IsDeclaration() {
+        return IsTypeName(context.currentToken.raw_val);
     }
 
-    std::unique_ptr<Statement> ParseNamespaceDef() {
-        Expect("namespace");
-        std::string name = context.currentToken.raw_val;
-        context.advance();
-        Expect("{");
-        std::vector<std::unique_ptr<Statement>> statements;
-        while (context.currentToken.raw_val != "}") {
-            statements.push_back(ParseStatement());
-        }
-        Expect("}");
-        return std::make_unique<NamespaceDef>(std::move(name), std::move(statements));
-    }
+    // Placeholder methods for parsing statements not fully implemented
+    std::unique_ptr<Statement> ParseIfStatement() { /* Implement accordingly */ }
+    std::unique_ptr<Statement> ParseWhileStatement() { /* Implement accordingly */ }
+    std::unique_ptr<Statement> ParseForStatement() { /* Implement accordingly */ }
 };
 
-#endif //STATEMENTPARSER_HPP
+#endif // STATEMENTPARSER_HPP

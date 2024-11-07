@@ -1,43 +1,49 @@
-//
-// Created by Elijah Crain on 10/29/24.
-//
-
 #ifndef FUNCTIONPARSER_HPP
 #define FUNCTIONPARSER_HPP
 
 #include "ParsingContext.hpp"
+#include "ParserBase.hpp"
+#include "StatementParser.hpp"
 
 class FunctionParser : public ParserBase {
   StatementParser statementParser;
   public:
   explicit FunctionParser(ParsingContext& context) : ParserBase(context), statementParser(context) {}
 
-  std::unique_ptr<FunctionDef>
-  ParseFunction() {
+  std::unique_ptr<FunctionDeclaration> ParseFunctionDeclaration() {
+    auto returnType = ParseType();
+
     std::string name = context.currentToken.raw_val;
     context.advance();
 
-    Expect("::");
     Expect("(");
-    Expect(")");
-    std::string returnType = context.currentToken.raw_val;
-    context.advance();
-    Expect("{");
-
-    int allocationSize = 0;
-    std::vector<std::unique_ptr<Statement>> statements;
-    while (context.currentToken.raw_val != "}") {
-      auto statement = statementParser.ParseStatement();
-      if (auto declare = dynamic_cast<Declare*>(statement.get())) {
-        if (declare->type == "int") {
-          allocationSize += 16; // Assuming int is 16 bytes as per original code
-        }
-      }
-      statements.push_back(std::move(statement));
+    std::vector<std::unique_ptr<Parameter>> parameters;
+    if (context.currentToken.raw_val != ")") {
+      do {
+        auto paramType = ParseType();
+        std::string paramName = context.currentToken.raw_val;
+        context.advance();
+        parameters.push_back(std::make_unique<Parameter>(std::move(paramName), std::move(paramType)));
+      } while (context.currentToken.raw_val == "," && (context.advance(), true));
     }
-    Expect("}");
-    return std::make_unique<FunctionDef>(std::move(name), allocationSize,std::move(returnType), std::move(statements));
+    Expect(")");
+
+    std::optional<std::unique_ptr<Block>> body = std::nullopt;
+    if (context.currentToken.raw_val == "{") {
+      body = statementParser.ParseBlock();
+    } else {
+      Expect(";");
+    }
+
+    return std::make_unique<FunctionDeclaration>(
+        std::move(name), std::move(parameters), std::move(body), std::move(returnType)
+    );
+  }
+
+  private:
+  std::unique_ptr<Type> ParseType() {
+    return statementParser.ParseType();
   }
 };
 
-#endif //FUNCTIONPARSER_HPP
+#endif // FUNCTIONPARSER_HPP
