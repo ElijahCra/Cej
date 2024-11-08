@@ -44,7 +44,7 @@ class Parser {
     if (context.peekNextToken().raw_val == "static") {
       return true;
     }
-    if (context.getLastTokenFromQueue().kind != TokenKind::TK_OPEN_PAREN) {
+    if (context.getLastToken().kind != TokenKind::TK_OPEN_PAREN) {
       return false;
     }
     if (context.peekNextToken().kind == TokenKind::TK_CLOSE_PAREN) {

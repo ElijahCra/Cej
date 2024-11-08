@@ -117,7 +117,8 @@ public:
 
             while (context.currentToken.raw_val == "*") {
                 context.advance();
-                typeNode = std::make_unique<PointerType>(std::move(typeNode));
+                auto pointerType = std::make_unique<PointerType>(std::move(typeNode));
+                return pointerType;
             }
 
             return typeNode;

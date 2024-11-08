@@ -33,7 +33,7 @@ struct ParsingContext {
     return tokenQueue.back();
   }
   [[nodiscard]] Token
-  getLastTokenFromQueue() {
+  getLastToken() {
     return tokenQueue.back();
   }
 
