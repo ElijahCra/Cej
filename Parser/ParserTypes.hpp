@@ -33,12 +33,9 @@ struct Type {
 
 enum class PrimitiveType {
     Char,
-    SChar,
-    UChar,
     Int,
-    UInt,
+    Float,
     Long,
-    ULong,
     Double,
     Void,
 };

@@ -11,10 +11,13 @@ class FunctionParser : public ParserBase {
   explicit FunctionParser(ParsingContext& context) : ParserBase(context), statementParser(context) {}
 
   std::unique_ptr<FunctionDeclaration> ParseFunctionDeclaration() {
-    auto returnType = ParseType();
+
 
     std::string name = context.currentToken.raw_val;
     context.advance();
+    Expect("::");
+
+
 
     Expect("(");
     std::vector<std::unique_ptr<Parameter>> parameters;
@@ -27,7 +30,7 @@ class FunctionParser : public ParserBase {
       } while (context.currentToken.raw_val == "," && (context.advance(), true));
     }
     Expect(")");
-
+    auto returnType = ParseType();
     std::optional<std::unique_ptr<Block>> body = std::nullopt;
     if (context.currentToken.raw_val == "{") {
       body = statementParser.ParseBlock();

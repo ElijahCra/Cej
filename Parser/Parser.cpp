@@ -4,10 +4,10 @@
 #define PARSER_CPP
 
 #include <vector>
-#include <set>
+#include <array>
 #include "../Lexer/Lexer.cpp"
 #include "ParserTypes.hpp"
-#include "StatementParser.hpp"
+#include "StatementParser.cpp"
 #include "FunctionParser.hpp"
 #include "ParsingContext.hpp"
 
@@ -35,6 +35,7 @@ class Parser {
   ParsingContext context;
   StatementParser statementParser;
   FunctionParser functionParser;
+
 
   bool
   IsFunctionDeclaration() {
@@ -78,7 +79,7 @@ class Parser {
 
   static bool
   IsTypeName(const std::string& name) {
-    static constexpr std::set<std::string> typeNames {
+    static const std::set<std::string> typeNames {
       "char", "signed", "unsigned", "int", "long", "double", "void", "float", "struct"
     };
     return typeNames.contains(name);

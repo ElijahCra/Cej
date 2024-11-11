@@ -6,6 +6,7 @@
 #define PARSINGCONTEXT_HPP
 
 #include <deque>
+#include <set>
 #include "../Lexer/Lexer.cpp"
 
 struct ParsingContext {
@@ -46,6 +47,14 @@ struct ParsingContext {
   getCurrentPosition() const {
     return lexer.getCurrentPosition();
   }
+
+  bool IsTypeName(const std::string& name) const {
+    static const std::set<std::string> typeNames = {
+      "char", "signed", "unsigned", "int", "long", "double", "void", "float", "struct"
+      // Add other type names as necessary
+  };
+    return typeNames.count(name) > 0;
+  }
 };
 
-#endif //PARSINGCONTEXT_HPP
+#endif // PARSINGCONTEXT_HPP

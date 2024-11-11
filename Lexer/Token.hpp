@@ -22,7 +22,8 @@ enum class TokenKind {
   TK_CLOSE_BRACE,
   TK_OPEN_PAREN,
   TK_CLOSE_PAREN,
-  TK_COMMA
+  TK_COMMA,
+  TK_DOUBLE_QUOTE
 };
 
 struct Token {
