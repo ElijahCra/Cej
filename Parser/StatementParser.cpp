@@ -47,9 +47,11 @@ StatementParser::ParseStatement() {
 
 std::unique_ptr<Declaration>
 StatementParser::ParseVariableDeclaration() {
-  auto varType = ParseType();
+
   std::string name = context.currentToken.raw_val;
   context.advance();
+  Expect(":");
+  auto varType = ParseType();
   std::optional<std::unique_ptr<Initializer>> initializer = std::nullopt;
 
   if (context.currentToken.raw_val == "=") {
@@ -126,4 +128,39 @@ StatementParser::ParseType() {
     return typeNode;
   }
   throw std::runtime_error("Unknown type at line: " + std::to_string(context.getCurrentLine()));
+}
+
+bool StatementParser::IsPrimitiveType(const std::string& typeName) {
+  static const std::set<std::string> primitiveTypes = {
+    "char", "int", "long", "double", "void", "float"
+};
+  return primitiveTypes.contains(typeName);
+}
+
+PrimitiveType StatementParser::StringToPrimitiveType(const std::string& typeName) {
+  if (typeName == "char") return PrimitiveType::Char;
+  if (typeName == "int") return PrimitiveType::Int;
+  if (typeName == "long") return PrimitiveType::Long;
+  if (typeName == "double") return PrimitiveType::Double;
+  if (typeName == "float") return PrimitiveType::Double;
+  if (typeName == "void") return PrimitiveType::Void;
+  throw std::runtime_error("Unknown primitive type: " + typeName);
+}
+
+std::unique_ptr<MemberDeclaration> StatementParser::ParseMemberDeclaration() {
+  auto memberType = ParseType();
+  std::string memberName = context.currentToken.raw_val;
+  context.advance();
+  Expect(";");
+  return std::make_unique<MemberDeclaration>(std::move(memberName), std::move(memberType));
+}
+
+bool StatementParser::IsDeclaration() {
+  if (context.currentToken.kind != TokenKind::TK_IDENTIFIER) {
+    return false;
+  }
+  if (context.peekNextToken().raw_val!=":") {
+    return false;
+  }
+  return IsTypeName(context.peekNextToken().raw_val);
 }

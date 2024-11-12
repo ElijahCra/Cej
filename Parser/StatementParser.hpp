@@ -35,34 +35,13 @@ public:
     }
 
 private:
-  static bool IsPrimitiveType(const std::string& typeName) {
-    static const std::set<std::string> primitiveTypes = {
-        "char", "int", "long", "double", "void", "float"
-    };
-    return primitiveTypes.contains(typeName);
-  }
+  static bool IsPrimitiveType(const std::string& typeName);
 
-  PrimitiveType StringToPrimitiveType(const std::string& typeName) {
-    if (typeName == "char") return PrimitiveType::Char;
-    if (typeName == "int") return PrimitiveType::Int;
-    if (typeName == "long") return PrimitiveType::Long;
-    if (typeName == "double") return PrimitiveType::Double;
-    if (typeName == "float") return PrimitiveType::Double;
-    if (typeName == "void") return PrimitiveType::Void;
-    throw std::runtime_error("Unknown primitive type: " + typeName);
-  }
+  static PrimitiveType StringToPrimitiveType(const std::string& typeName);
 
-    std::unique_ptr<MemberDeclaration> ParseMemberDeclaration() {
-      auto memberType = ParseType();
-      std::string memberName = context.currentToken.raw_val;
-      context.advance();
-      Expect(";");
-      return std::make_unique<MemberDeclaration>(std::move(memberName), std::move(memberType));
-    }
+  std::unique_ptr<MemberDeclaration> ParseMemberDeclaration();
 
-    bool IsDeclaration() {
-        return IsTypeName(context.currentToken.raw_val);
-    }
+  bool IsDeclaration();
 
     // Placeholder methods for parsing statements not fully implemented
     std::unique_ptr<Statement> ParseIfStatement() { /* Implement accordingly */ }
