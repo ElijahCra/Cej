@@ -4,8 +4,6 @@
 //#include "Generator/Generator.cpp"
 #include "Parser/Parser.cpp"
 
-
-
 int main(int argc, char *argv[]) {
   if (1 == argc && **argv == '/') {
     Lexer lexer("../example.cej");

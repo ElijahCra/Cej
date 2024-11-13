@@ -11,15 +11,12 @@ class FunctionParser : public ParserBase {
   explicit FunctionParser(ParsingContext& context) : ParserBase(context), statementParser(context) {}
 
   std::unique_ptr<FunctionDeclaration> ParseFunctionDeclaration() {
-
-
     std::string name = context.currentToken.raw_val;
     context.advance();
+
     Expect("::");
-
-
-
     Expect("(");
+
     std::vector<std::unique_ptr<Parameter>> parameters;
     if (context.currentToken.raw_val != ")") {
       do {

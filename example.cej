@@ -1,10 +1,10 @@
 f :: () int {
     return 2;
 }
-
+globalVar : int = 4;
 g :: () int {
     var:int=3;
-    return f()+(2*var);
+    return f()+(2*var+globalVar);
 }
 
 main :: () int {

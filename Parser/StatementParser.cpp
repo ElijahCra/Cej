@@ -155,7 +155,7 @@ std::unique_ptr<MemberDeclaration> StatementParser::ParseMemberDeclaration() {
   return std::make_unique<MemberDeclaration>(std::move(memberName), std::move(memberType));
 }
 
-bool StatementParser::IsDeclaration() {
+bool StatementParser::IsDeclaration() const {
   if (context.currentToken.kind != TokenKind::TK_IDENTIFIER) {
     return false;
   }
@@ -163,4 +163,9 @@ bool StatementParser::IsDeclaration() {
     return false;
   }
   return IsTypeName(context.peekNextToken().raw_val);
+}
+
+bool
+StatementParser::IsTypeName(const std::string& name) {
+  return IsPrimitiveType(name) || name == "struct";
 }

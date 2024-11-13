@@ -10,8 +10,8 @@
 #include "ExpressionParser.cpp"
 
 class StatementParser : public ParserBase {
-    ExpressionParser expressionParser;
-public:
+  ExpressionParser expressionParser;
+  public:
   explicit StatementParser(ParsingContext& context) : ParserBase(context), expressionParser(context) {}
 
   std::unique_ptr<Statement>
@@ -30,23 +30,22 @@ public:
   ParseType();
 
   static bool
-  IsTypeName(const std::string& name) {
-        return IsPrimitiveType(name) || name == "struct";
-    }
+  IsTypeName(const std::string& name);
 
-private:
+
+  private:
+
+  [[nodiscard]] bool IsDeclaration() const;
   static bool IsPrimitiveType(const std::string& typeName);
 
   static PrimitiveType StringToPrimitiveType(const std::string& typeName);
 
   std::unique_ptr<MemberDeclaration> ParseMemberDeclaration();
 
-  bool IsDeclaration();
 
-    // Placeholder methods for parsing statements not fully implemented
-    std::unique_ptr<Statement> ParseIfStatement() { /* Implement accordingly */ }
-    std::unique_ptr<Statement> ParseWhileStatement() { /* Implement accordingly */ }
-    std::unique_ptr<Statement> ParseForStatement() { /* Implement accordingly */ }
+  std::unique_ptr<Statement> ParseIfStatement(){return nullptr;};//todo
+  std::unique_ptr<Statement> ParseWhileStatement(){return nullptr;};//todo
+  std::unique_ptr<Statement> ParseForStatement(){return nullptr;};//todo
 };
 
 #endif // STATEMENTPARSER_HPP
