@@ -3,6 +3,7 @@
 // "Builder/BuildSystem.cpp"
 //#include "Generator/Generator.cpp"
 #include "Parser/Parser.cpp"
+#include "Analyzer/SemanticAnalyzer.hpp"
 
 int main(int argc, char *argv[]) {
   if (1 == argc && **argv == '/') {
@@ -25,6 +26,8 @@ int main(int argc, char *argv[]) {
     Lexer lexer("example.cej");
     Parser parser(lexer);
     auto tree = parser.parseProgram();
+    SemanticAnalyzer analyzer;
+    analyzer.analyze(tree);
     //BuildSystem buildSystem;
     //buildSystem.ParseBuildFile(std::string(argv[2]));
     //buildSystem.BuildAll();
