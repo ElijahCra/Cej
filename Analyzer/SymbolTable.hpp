@@ -11,38 +11,37 @@
 #include "Symbol.hpp"
 
 class SymbolTable {
-  private:
-  std::unordered_map<std::string, Symbol> table;
-  SymbolTable* parent;
 
-  public:
-  SymbolTable(SymbolTable* p = nullptr) : parent(p) {}
+  std::vector<std::unordered_map<std::string, Symbol>> scopes;
 
-  bool declare(const std::string& name, const Symbol& symbol) {
-    if (table.find(name) != table.end()) {
-      // Symbol already declared in this scope
-      return false;
-    }
-    table.insert(std::make_pair(name,symbol));
-    return true;
+public:
+  SymbolTable() {
+    enterScope(); // Start with a global scope
+  }
+
+  void enterScope() {
+    scopes.emplace_back();
+  }
+
+  void exitScope() {
+    scopes.pop_back();
+  }
+
+  bool insert(const std::string& name, Symbol entry) {
+    auto& currentScope = scopes.back();
+    auto result = currentScope.emplace(name, std::move(entry));
+    return result.second; // returns true if insertion took place
   }
 
   Symbol* lookup(const std::string& name) {
-    auto it = table.find(name);
-    if (it != table.end()) {
-      return &it->second;
-    } else if (parent) {
-      return parent->lookup(name);
+    for (auto scopeIter = scopes.rbegin(); scopeIter != scopes.rend(); ++scopeIter) {
+      auto& scope = *scopeIter;
+      auto it = scope.find(name);
+      if (it != scope.end()) {
+        return &(it->second);
+      }
     }
     return nullptr;
-  }
-
-  SymbolTable* getParent() {
-    return parent;
-  }
-
-  ~SymbolTable() {
-    delete parent;
   }
 };
 

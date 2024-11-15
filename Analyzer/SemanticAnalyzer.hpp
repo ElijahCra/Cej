@@ -1,167 +1,184 @@
-//
-// Created by Elijah Crain on 11/13/24.
-//
-
 // SemanticAnalyzer.hpp
 #ifndef SEMANTICANALYZER_HPP
 #define SEMANTICANALYZER_HPP
 
-#include <iostream>
+#include <stdexcept>
 #include "../Parser/ParserTypes.hpp"
 #include "SymbolTable.hpp"
 
 class SemanticAnalyzer {
-private:
-    SymbolTable* currentScope;
-
 public:
-    SemanticAnalyzer() : currentScope(new SymbolTable()) {}
+    SemanticAnalyzer() = default;
 
-    void analyze(Program* program) {
-        visitProgram(program);
+    void analyze(Program& program) {
+        symbolTable.enterScope();
+        for (auto& decl : program.declarations) {
+            analyzeDeclaration(*decl);
+        }
+        symbolTable.exitScope();
     }
 
 private:
-    void enterScope() {
-        currentScope = new SymbolTable(currentScope);
-    }
+    SymbolTable symbolTable;
 
-    void leaveScope() {
-        SymbolTable* oldScope = currentScope;
-        currentScope = currentScope->getParent();
-        delete oldScope;
-    }
-
-    void visitProgram(Program* program) {
-        for (auto& decl : program->declarations) {
-            visitDeclaration(decl.get());
+    void analyzeDeclaration(Declaration& decl) {
+        if (auto varDecl = dynamic_cast<VariableDeclaration*>(&decl)) {
+            analyzeVariableDeclaration(*varDecl);
+        } else if (auto funcDecl = dynamic_cast<FunctionDeclaration*>(&decl)) {
+            analyzeFunctionDeclaration(*funcDecl);
+        } else if (auto structDecl = dynamic_cast<StructDeclaration*>(&decl)) {
+            analyzeStructDeclaration(*structDecl);
+        } else {
+            // Handle other declaration types
         }
     }
 
-    void visitDeclaration(Declaration* decl) {
-        if (auto varDecl = dynamic_cast<VariableDeclaration*>(decl)) {
-            visitVariableDeclaration(varDecl);
-        } else if (auto funcDecl = dynamic_cast<FunctionDeclaration*>(decl)) {
-            visitFunctionDeclaration(funcDecl);
-        } else if (auto structDecl = dynamic_cast<StructDeclaration*>(decl)) {
-            visitStructDeclaration(structDecl);
+    void analyzeVariableDeclaration(VariableDeclaration& varDecl) {
+        // Check if variable is already declared in current scope
+        if (!symbolTable.insert(varDecl.name, Symbol(varDecl.name, varDecl.varType->clone(), Symbol::Kind::Variable))) {
+            throw std::runtime_error("Variable '" + varDecl.name + "' is already declared in this scope.");
+        }
+
+        // Optionally, analyze the initializer
+        if (varDecl.initializer.has_value()) {
+            analyzeInitializer(*varDecl.initializer.value());
         }
     }
 
-    void visitVariableDeclaration(VariableDeclaration* varDecl) {
-        Symbol symbol(varDecl->name, varDecl->varType.get(), SymbolKind::Variable);
-        if (!currentScope->declare(varDecl->name, symbol)) {
-            reportError("Variable '" + varDecl->name + "' redeclared");
-        }
-
-        if (varDecl->initializer.has_value()) {
-            visitInitializer(varDecl->initializer.value().get());
+    void analyzeInitializer(Initializer& init) {
+        if (auto singleInit = dynamic_cast<SingleInit*>(&init)) {
+            analyzeExpression(*singleInit->expression);
+        } else if (auto compoundInit = dynamic_cast<CompoundInit*>(&init)) {
+            for (auto& subInit : compoundInit->initializers) {
+                analyzeInitializer(*subInit);
+            }
         }
     }
 
-    void visitFunctionDeclaration(FunctionDeclaration* funcDecl) {
-        Symbol symbol(funcDecl->name, funcDecl->funType.get(), SymbolKind::Function);
-        if (!currentScope->declare(funcDecl->name, symbol)) {
-            reportError("Function '" + funcDecl->name + "' redeclared");
+    void analyzeFunctionDeclaration(FunctionDeclaration& funcDecl) {
+        // Build function type
+        std::vector<std::unique_ptr<Type>> paramTypes;
+        for (auto& param : funcDecl.parameters) {
+            paramTypes.push_back(param->paramType->clone());
+        }
+        auto funType = std::make_unique<FunType>(std::move(paramTypes), funcDecl.funType->clone());
+
+        // Check if function is already declared
+        if (!symbolTable.insert(funcDecl.name, Symbol(funcDecl.name, std::move(funType), Symbol::Kind::Function))) {
+            throw std::runtime_error("Function '" + funcDecl.name + "' is already declared.");
         }
 
-        enterScope();
+        symbolTable.enterScope(); // Enter function scope
 
-        for (auto& param : funcDecl->parameters) {
-            Symbol paramSymbol(param->name, param->paramType.get(), SymbolKind::Variable);
-            if (!currentScope->declare(param->name, paramSymbol)) {
-                reportError("Parameter '" + param->name + "' redeclared");
+        // Add parameters to symbol table
+        for (auto& param : funcDecl.parameters) {
+            if (!symbolTable.insert(param->name, Symbol(param->name, param->paramType->clone(), Symbol::Kind::Variable))) {
+                throw std::runtime_error("Parameter '" + param->name + "' is already declared.");
             }
         }
 
-        if (funcDecl->body.has_value()) {
-            visitBlock(funcDecl->body.value().get());
+        // Analyze function body
+        if (funcDecl.body.has_value()) {
+            analyzeBlock(*funcDecl.body.value());
         }
 
-        leaveScope();
+        symbolTable.exitScope(); // Exit function scope
     }
 
-    void visitStructDeclaration(StructDeclaration* structDecl) {
-        // Handle struct declarations if needed
-    }
+    void analyzeStructDeclaration(StructDeclaration& structDecl) {
+        // Store the struct type in the symbol table
+        auto structType = std::make_unique<StructType>(structDecl.tag);
 
-    void visitBlock(Block* block) {
-        enterScope();
-
-        for (auto& item : block->items) {
-            if (auto stmtItem = dynamic_cast<BlockItemStatement*>(item.get())) {
-                visitStatement(stmtItem->statement.get());
-            } else if (auto declItem = dynamic_cast<BlockItemDeclaration*>(item.get())) {
-                visitDeclaration(declItem->declaration.get());
-            }
+        if (!symbolTable.insert(structDecl.tag, Symbol(structDecl.tag, std::move(structType), Symbol::Kind::Struct))) {
+            throw std::runtime_error("Struct '" + structDecl.tag + "' is already declared.");
         }
 
-        leaveScope();
+        // Optionally, analyze members
+        // For simplicity, we're not adding struct members to the symbol table
     }
 
-    void visitStatement(Statement* stmt) {
-        if (auto exprStmt = dynamic_cast<ExpressionStatement*>(stmt)) {
-            visitExpression(exprStmt->expression.get());
-        } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
+    void analyzeBlock(Block& block) {
+        symbolTable.enterScope();
+        for (auto& item : block.items) {
+            analyzeBlockItem(*item);
+        }
+        symbolTable.exitScope();
+    }
+
+    void analyzeBlockItem(BlockItem& item) {
+        if (auto stmtItem = dynamic_cast<BlockItemStatement*>(&item)) {
+            analyzeStatement(*stmtItem->statement);
+        } else if (auto declItem = dynamic_cast<BlockItemDeclaration*>(&item)) {
+            analyzeDeclaration(*declItem->declaration);
+        }
+    }
+
+    void analyzeStatement(Statement& stmt) {
+        if (auto exprStmt = dynamic_cast<ExpressionStatement*>(&stmt)) {
+            analyzeExpression(*exprStmt->expression);
+        } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(&stmt)) {
             if (returnStmt->expression.has_value()) {
-                visitExpression(returnStmt->expression.value().get());
+                analyzeExpression(*returnStmt->expression.value());
             }
-        } else if (auto ifStmt = dynamic_cast<IfStatement*>(stmt)) {
-            visitExpression(ifStmt->condition.get());
-            visitStatement(ifStmt->thenBranch.get());
+        } else if (auto compoundStmt = dynamic_cast<CompoundStatement*>(&stmt)) {
+            analyzeBlock(*compoundStmt->block);
+        } else if (auto ifStmt = dynamic_cast<IfStatement*>(&stmt)) {
+            analyzeExpression(*ifStmt->condition);
+            analyzeStatement(*ifStmt->thenBranch);
             if (ifStmt->elseBranch.has_value()) {
-                visitStatement(ifStmt->elseBranch.value().get());
+                analyzeStatement(*ifStmt->elseBranch.value());
             }
-        } else if (auto compoundStmt = dynamic_cast<CompoundStatement*>(stmt)) {
-            visitBlock(compoundStmt->block.get());
-        } else if (auto whileStmt = dynamic_cast<WhileStatement*>(stmt)) {
-            visitExpression(whileStmt->condition.get());
-            visitStatement(whileStmt->body.get());
+        } else if (auto whileStmt = dynamic_cast<WhileStatement*>(&stmt)) {
+            analyzeExpression(*whileStmt->condition);
+            analyzeStatement(*whileStmt->body);
+        } else if (auto forStmt = dynamic_cast<ForStatement*>(&stmt)) {
+            symbolTable.enterScope();
+            if (auto initDecl = dynamic_cast<InitDecl*>(forStmt->init.get())) {
+                analyzeVariableDeclaration(*initDecl->declaration);
+            } else if (auto initExp = dynamic_cast<InitExp*>(forStmt->init.get())) {
+                if (initExp->expression.has_value()) {
+                    analyzeExpression(*initExp->expression.value());
+                }
+            }
+            if (forStmt->condition.has_value()) {
+                analyzeExpression(*forStmt->condition.value());
+            }
+            if (forStmt->post.has_value()) {
+                analyzeExpression(*forStmt->post.value());
+            }
+            analyzeStatement(*forStmt->body);
+            symbolTable.exitScope();
         }
         // Handle other statement types as needed
     }
 
-    void visitExpression(Exp* expr) {
-        if (auto varExpr = dynamic_cast<Var*>(expr)) {
-            Symbol* symbol = currentScope->lookup(varExpr->name);
+    void analyzeExpression(Exp& exp) {
+        if (auto varExp = dynamic_cast<Var*>(&exp)) {
+            // Check if variable is declared
+            auto symbol = symbolTable.lookup(varExp->name);
             if (!symbol) {
-                reportError("Use of undeclared variable '" + varExpr->name + "'");
+                throw std::runtime_error("Use of undeclared variable '" + varExp->name + "'.");
             }
-        } else if (auto binOpExpr = dynamic_cast<BinOp*>(expr)) {
-            visitExpression(binOpExpr->lhs.get());
-            visitExpression(binOpExpr->rhs.get());
-        } else if (auto unOpExpr = dynamic_cast<UnOp*>(expr)) {
-            visitExpression(unOpExpr->operand.get());
-        } else if (auto funcCallExpr = dynamic_cast<FunctionCall*>(expr)) {
-            Symbol* symbol = currentScope->lookup(funcCallExpr->name);
-            if (!symbol) {
-                reportError("Call to undeclared function '" + funcCallExpr->name + "'");
-            } else if (symbol->kind != SymbolKind::Function) {
-                reportError("'" + funcCallExpr->name + "' is not a function");
+        } else if (auto binOpExp = dynamic_cast<BinOp*>(&exp)) {
+            analyzeExpression(*binOpExp->lhs);
+            analyzeExpression(*binOpExp->rhs);
+        } else if (auto unOpExp = dynamic_cast<UnOp*>(&exp)) {
+            analyzeExpression(*unOpExp->operand);
+        } else if (auto assignExp = dynamic_cast<Assignment*>(&exp)) {
+            analyzeExpression(*assignExp->lhs);
+            analyzeExpression(*assignExp->rhs);
+        } else if (auto funcCallExp = dynamic_cast<FunctionCall*>(&exp)) {
+            // Check if function is declared
+            auto symbol = symbolTable.lookup(funcCallExp->name);
+            if (!symbol || symbol->kind != Symbol::Kind::Function) {
+                throw std::runtime_error("Call to undeclared function '" + funcCallExp->name + "'.");
             }
-
-            for (auto& arg : funcCallExpr->arguments) {
-                visitExpression(arg.get());
+            // Analyze arguments
+            for (auto& arg : funcCallExp->arguments) {
+                analyzeExpression(*arg);
             }
-        } else if (auto assignmentExpr = dynamic_cast<Assignment*>(expr)) {
-            visitExpression(assignmentExpr->lhs.get());
-            visitExpression(assignmentExpr->rhs.get());
         }
         // Handle other expression types as needed
-    }
-
-    void visitInitializer(Initializer* init) {
-        if (auto singleInit = dynamic_cast<SingleInit*>(init)) {
-            visitExpression(singleInit->expression.get());
-        } else if (auto compoundInit = dynamic_cast<CompoundInit*>(init)) {
-            for (auto& subInit : compoundInit->initializers) {
-                visitInitializer(subInit.get());
-            }
-        }
-    }
-
-    void reportError(const std::string& message) {
-        std::cerr << "Semantic error: " << message << std::endl;
     }
 };
 

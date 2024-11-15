@@ -9,18 +9,21 @@
 #include <memory>
 #include "../Parser/ParserTypes.hpp"
 
-enum class SymbolKind {
-  Variable,
-  Function
-};
+
 
 struct Symbol {
-  std::string name;
-  Type type;
-  SymbolKind kind;
+  enum class Kind {
+    Variable,
+    Function,
+    Struct
+  };
 
-  Symbol(std::string n, Type t, SymbolKind k)
-      : name(std::move(n)), type(t), kind(k) {}
+  std::string name;
+  std::unique_ptr<Type> type;
+  Kind kind;
+
+  Symbol(std::string n, std::unique_ptr<Type> t, const Kind k)
+        : name(std::move(n)), type(std::move(t)), kind(k) {}
 };
 
 
