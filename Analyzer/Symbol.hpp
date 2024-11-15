@@ -16,11 +16,11 @@ enum class SymbolKind {
 
 struct Symbol {
   std::string name;
-  std::unique_ptr<Type> type;
+  Type type;
   SymbolKind kind;
 
-  Symbol(std::string n, std::unique_ptr<Type> t, SymbolKind k)
-      : name(std::move(n)), type(std::move(t)), kind(k) {}
+  Symbol(std::string n, Type t, SymbolKind k)
+      : name(std::move(n)), type(t), kind(k) {}
 };
 
 

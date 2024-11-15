@@ -49,8 +49,8 @@ private:
     }
 
     void visitVariableDeclaration(VariableDeclaration* varDecl) {
-        Symbol symbol(varDecl->name, varDecl->varType, SymbolKind::Variable);
-        if (!currentScope->declare(varDecl->name, std::move(symbol))) {
+        Symbol symbol(varDecl->name, varDecl->varType.get(), SymbolKind::Variable);
+        if (!currentScope->declare(varDecl->name, symbol)) {
             reportError("Variable '" + varDecl->name + "' redeclared");
         }
 
@@ -60,16 +60,16 @@ private:
     }
 
     void visitFunctionDeclaration(FunctionDeclaration* funcDecl) {
-        Symbol symbol(funcDecl->name, funcDecl->funType->clone(), SymbolKind::Function);
-        if (!currentScope->declare(funcDecl->name, std::move(symbol))) {
+        Symbol symbol(funcDecl->name, funcDecl->funType.get(), SymbolKind::Function);
+        if (!currentScope->declare(funcDecl->name, symbol)) {
             reportError("Function '" + funcDecl->name + "' redeclared");
         }
 
         enterScope();
 
         for (auto& param : funcDecl->parameters) {
-            Symbol paramSymbol(param->name, param->paramType->clone(), SymbolKind::Variable);
-            if (!currentScope->declare(param->name, std::move(paramSymbol))) {
+            Symbol paramSymbol(param->name, param->paramType.get(), SymbolKind::Variable);
+            if (!currentScope->declare(param->name, paramSymbol)) {
                 reportError("Parameter '" + param->name + "' redeclared");
             }
         }

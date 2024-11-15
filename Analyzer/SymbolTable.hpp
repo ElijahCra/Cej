@@ -18,12 +18,12 @@ class SymbolTable {
   public:
   SymbolTable(SymbolTable* p = nullptr) : parent(p) {}
 
-  bool declare(const std::string& name, Symbol symbol) {
+  bool declare(const std::string& name, const Symbol& symbol) {
     if (table.find(name) != table.end()) {
       // Symbol already declared in this scope
       return false;
     }
-    table[name] = std::move(symbol);
+    table.insert(std::make_pair(name,symbol));
     return true;
   }
 

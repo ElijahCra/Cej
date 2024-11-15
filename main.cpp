@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
     Parser parser(lexer);
     auto tree = parser.parseProgram();
     SemanticAnalyzer analyzer;
-    analyzer.analyze(tree);
+    analyzer.analyze(tree.get());
     //BuildSystem buildSystem;
     //buildSystem.ParseBuildFile(std::string(argv[2]));
     //buildSystem.BuildAll();
