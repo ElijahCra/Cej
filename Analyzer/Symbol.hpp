@@ -22,8 +22,7 @@ struct Symbol {
   std::unique_ptr<Type> type;
   Kind kind;
 
-  Symbol(std::string n, std::unique_ptr<Type> t, const Kind k)
-        : name(std::move(n)), type(std::move(t)), kind(k) {}
+  Symbol(std::string n, std::unique_ptr<Type> t, const Kind k) : name(std::move(n)), type(std::move(t)), kind(k) {}
 };
 
 

@@ -29,7 +29,9 @@ struct Program : ASTNode {
 // Type Hierarchy
 struct Type {
   virtual ~Type() = default;
-  [[nodiscard]] virtual std::unique_ptr<Type> clone() const = 0;
+
+  [[nodiscard]] virtual std::unique_ptr<Type>
+  clone() const = 0;
 };
 
 enum class PrimitiveType {
@@ -57,8 +59,10 @@ struct FunType : Type {
   FunType(std::vector<std::unique_ptr<Type>> params, std::unique_ptr<Type> ret)
       : parameterTypes(std::move(params)), returnType(std::move(ret)) {}
 
-  [[nodiscard]] std::unique_ptr<Type> clone() const override {
+  [[nodiscard]] std::unique_ptr<Type>
+  clone() const override {
     std::vector<std::unique_ptr<Type>> paramTypesCopy;
+    paramTypesCopy.reserve(parameterTypes.size());
     for (const auto& param : parameterTypes) {
       paramTypesCopy.push_back(param->clone());
     }
@@ -91,7 +95,8 @@ struct StructType : Type {
   std::string tag;
   explicit StructType(std::string t) : tag(std::move(t)) {}
 
-  [[nodiscard]] std::unique_ptr<Type> clone() const override {
+  [[nodiscard]] std::unique_ptr<Type>
+  clone() const override {
     return std::make_unique<StructType>(tag);
   }
 };
@@ -263,28 +268,25 @@ enum class ConstantType {
   UChar
 };
 
-struct Constant : Exp {
+struct Constant final : Exp {
   ConstantType type;
-  union {
-      double numericValue;
-      char charValue;
-  };
-  explicit Constant(int v) : type(ConstantType::Int), numericValue(v) {}
-  explicit Constant(long v) : type(ConstantType::Long), numericValue(v) {}
-  explicit Constant(unsigned int v) : type(ConstantType::UInt), numericValue(v) {}
-  explicit Constant(unsigned long v) : type(ConstantType::ULong), numericValue(v) {}
-  explicit Constant(double v) : type(ConstantType::Double), numericValue(v) {}
-  explicit Constant(char v) : type(ConstantType::Char), charValue(v) {}
-  explicit Constant(unsigned char v) : type(ConstantType::UChar), charValue(v) {}
+  std::variant<int,long,unsigned int,unsigned long, double, char, unsigned char> value;
+  explicit Constant(const int v) : type(ConstantType::Int), value(v) {}
+  explicit Constant(const long v) : type(ConstantType::Long), value(v) {}
+  explicit Constant(const unsigned int v) : type(ConstantType::UInt), value(v) {}
+  explicit Constant(const unsigned long v) : type(ConstantType::ULong), value(v) {}
+  explicit Constant(const double v) : type(ConstantType::Double), value(v) {}
+  explicit Constant(const char v) : type(ConstantType::Char), value(v) {}
+  explicit Constant(const unsigned char v) : type(ConstantType::UChar), value(v) {}
 };
 
-struct StringLiteral : Exp {
+struct StringLiteral final : Exp {
   std::string value;
   explicit StringLiteral(std::string v) : value(std::move(v)) {}
 };
 
 // Variable Expression
-struct Var : Exp {
+struct Var final : Exp {
   std::string name;
   explicit Var(std::string n) : name(std::move(n)) {}
 };
