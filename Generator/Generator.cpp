@@ -29,13 +29,50 @@ public:
             }
         }
 
-        // Global directives for macOS/iOS ARM64
-        EmitLine("\t.section __TEXT,__text");
-        EmitLine("\t.align 4");
+        // Data section first for global variables
+        EmitLine("\t.data");
+        EmitLine("\t.p2align 2");  // Align to 4-byte boundary
 
-        // Generate code for each declaration
+        // Generate all global variables
         for (const auto& decl : program->declarations) {
-            GenerateDeclaration(*decl);
+            if (const auto* varDecl = dynamic_cast<const VariableDeclaration*>(decl.get())) {
+                if (currentFunction.empty()) { // If we're not inside a function
+                    // Global variable definition
+                    EmitLine("\t.globl _" + varDecl->name);
+                    EmitLine("_" + varDecl->name + ":");
+
+                    // Handle initialization
+                    if (varDecl->initializer.has_value()) {
+                        if (const auto* singleInit = dynamic_cast<const SingleInit*>(varDecl->initializer.value().get())) {
+                            if (const auto* constant = dynamic_cast<const Constant*>(singleInit->expression.get())) {
+                                // If it's a simple constant, emit it directly
+                                int value = 0;
+                                if (constant->type == ConstantType::Int) {
+                                    value = std::get<int>(constant->value);
+                                }
+                                EmitLine("\t.long " + std::to_string(value));
+                            } else {
+                                EmitLine("\t.long 0");  // Default to 0 for complex initializers
+                            }
+                        } else {
+                            EmitLine("\t.long 0");  // Default to 0 for complex initializers
+                        }
+                    } else {
+                        EmitLine("\t.long 0");  // Default to 0 for uninitialized variables
+                    }
+                }
+            }
+        }
+
+        // Text section for code
+        EmitLine("\t.text");
+        EmitLine("\t.p2align 2");  // Align to 4-byte boundary
+
+        // Generate code for function declarations
+        for (const auto& decl : program->declarations) {
+            if (const auto* funcDecl = dynamic_cast<const FunctionDeclaration*>(decl.get())) {
+                GenerateFunctionDeclaration(*funcDecl);
+            }
         }
 
         return assembly.str();
@@ -135,13 +172,12 @@ private:
 
     static void
     GenerateDeclaration(Declaration& decl) {
-        if (const auto* varDecl = dynamic_cast<VariableDeclaration*>(&decl)) {
-            GenerateVariableDeclaration(*varDecl);
-        } else if (const auto* funcDecl = dynamic_cast<FunctionDeclaration*>(&decl)) {
+        if (const auto* funcDecl = dynamic_cast<FunctionDeclaration*>(&decl)) {
             GenerateFunctionDeclaration(*funcDecl);
         } else if (const auto* structDecl = dynamic_cast<StructDeclaration*>(&decl)) {
             GenerateStructDeclaration(*structDecl);
         }
+        // Variable declarations are handled directly in GenerateAssembly
     }
 
     static void
@@ -151,15 +187,14 @@ private:
             // Record this as a global variable
             globalVariables[varDecl.name] = varDecl.name;
 
-            // Switch to data section
-            EmitLine("\t.section __DATA,__data");
-            EmitLine("\t.align 3");
-            EmitLine("\t.globl _" + varDecl.name);  // Using .globl instead of .global for Apple syntax
+            // Switch to data section - use standard syntax for maximum compatibility
+            EmitLine("\t.data");
+            EmitLine("\t.p2align 2");  // Align to 4-byte boundary (2^2)
+            EmitLine("\t.globl _" + varDecl.name);
             EmitLine("_" + varDecl.name + ":");
 
-            int size = GetTypeSize(*varDecl.varType);
+            // Handle initialization
             if (varDecl.initializer.has_value()) {
-                // For global initializers, we need to emit the value directly
                 if (const auto* singleInit = dynamic_cast<const SingleInit*>(varDecl.initializer.value().get())) {
                     if (const auto* constant = dynamic_cast<const Constant*>(singleInit->expression.get())) {
                         // If it's a simple constant, emit it directly
@@ -167,20 +202,19 @@ private:
                         if (constant->type == ConstantType::Int) {
                             value = std::get<int>(constant->value);
                         }
-                        // For simplicity, we're just handling integers
                         EmitLine("\t.long " + std::to_string(value));
                     } else {
-                        // More complex initializers would need evaluation at compile time
-                        EmitLine("\t.skip " + std::to_string(size) + ", 0");
+                        EmitLine("\t.long 0");  // Default to 0 for complex initializers
                     }
                 } else {
-                    EmitLine("\t.skip " + std::to_string(size) + ", 0");
+                    EmitLine("\t.long 0");  // Default to 0 for complex initializers
                 }
             } else {
-                EmitLine("\t.skip " + std::to_string(size) + ", 0");
+                EmitLine("\t.long 0");  // Default to 0 for uninitialized variables
             }
+
             // Switch back to text section
-            EmitLine("\t.section __TEXT,__text");
+            EmitLine("\t.text");
         } else {
             // Local variables are handled in statement generation
         }
@@ -207,15 +241,20 @@ private:
         bool isMainFunction = (funcDecl.name == "main");
 
         // Function entry
-        EmitLine("\t.globl _" + funcDecl.name);  // Using .globl for Apple macOS/iOS syntax
+        EmitLine("\t.globl _" + funcDecl.name);
         EmitLine("_" + funcDecl.name + ":");
 
         // Function prologue
         EmitLine("\tstp x29, x30, [sp, #-16]!"); // Save frame pointer and link register
         EmitLine("\tmov x29, sp");               // Set up frame pointer
 
-        // Reserve stack space for parameters and local variables
-        // This will be updated later based on actual stack usage
+        // Add pointers to all globals used in this function, with literal label syntax
+        for (const auto& [name, _] : globalVariables) {
+            // Use a literal pool approach
+            EmitLine("Lptr_" + name + "_" + std::to_string(labelCounter) + ":");
+            EmitLine("\t.quad _" + name);
+            labelCounter++;
+        }
 
         // Allocate space for parameters
         for (size_t i = 0; i < funcDecl.parameters.size(); i++) {
@@ -224,11 +263,10 @@ private:
 
             // Move parameter from register to stack
             if (i < 8) { // First 8 parameters are in registers x0-x7
-                EmitLine("\tstr x" + std::to_string(i) + ", [x29, #" +
+                EmitLine("\tstr w" + std::to_string(i) + ", [x29, #" +
                         std::to_string(functionVariables[currentFunction][param->name]) + "]");
             } else {
                 // Parameters beyond the first 8 are passed on the stack
-                // Will need to be loaded from stack relative to frame pointer
                 // Not implemented here
             }
         }
@@ -495,13 +533,16 @@ private:
         } else if (const auto* var = dynamic_cast<const Var*>(&exp)) {
             auto [isGlobal, offset] = GetVariableOffset(var->name);
             if (isGlobal) {
-                // Load global variable address
+                // Global variable access using a safer approach with explicit label
+                int labelIndex = GetNextLabel();
+                std::string labelName = "Lloadglobal_" + var->name + "_" + std::to_string(labelIndex);
+
                 EmitLine("\tadrp x0, _" + var->name + "@PAGE");
                 EmitLine("\tadd x0, x0, _" + var->name + "@PAGEOFF");
-                EmitLine("\tldr x0, [x0]");
+                EmitLine("\tldr w0, [x0]");
             } else {
                 // Load local variable
-                EmitLine("\tldr x0, [x29, #" + std::to_string(offset) + "]");
+                EmitLine("\tldr w0, [x29, #" + std::to_string(offset) + "]");
             }
         } else if (const auto* binOp = dynamic_cast<const BinOp*>(&exp)) {
             GenerateBinaryOperation(*binOp);
@@ -687,16 +728,19 @@ private:
             auto [isGlobal, offset] = GetVariableOffset(var->name);
             if (isGlobal) {
                 // Save result in x1 temporarily
-                EmitLine("\tmov x1, x0");
-                // Load global variable address
+                EmitLine("\tmov w1, w0");
+
+                // Load global variable address using PAGE-relative addressing
                 EmitLine("\tadrp x0, _" + var->name + "@PAGE");
                 EmitLine("\tadd x0, x0, _" + var->name + "@PAGEOFF");
+
                 // Store value to global variable
-                EmitLine("\tstr x1, [x0]");
+                EmitLine("\tstr w1, [x0]");
+
                 // Put result back in x0
-                EmitLine("\tmov x0, x1");
+                EmitLine("\tmov w0, w1");
             } else {
-                EmitLine("\tstr x0, [x29, #" + std::to_string(offset) + "]");
+                EmitLine("\tstr w0, [x29, #" + std::to_string(offset) + "]");
             }
         } else if (const auto* dereference = dynamic_cast<const Dereference*>(assign.lhs.get())) {
             // Pointer dereference assignment: *ptr = value
