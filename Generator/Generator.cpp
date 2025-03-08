@@ -263,20 +263,26 @@ private:
             }
         }
 
-        // Generate function body if it exists
+        // Reserve space for all local variables upfront
         if (funcDecl.body.has_value()) {
+            // Pre-scan for variable declarations to get total stack size
+            PreScanForVariables(*funcDecl.body.value());
+
+            // Allocate the stack space all at once
+            int totalStackSize = (stackSize + 15) & ~15; // Align to 16 bytes
+            if (totalStackSize > 0) {
+                EmitLine("\tsub sp, sp, #" + std::to_string(totalStackSize));
+            }
+
+            // Generate the actual code
             GenerateBlock(*funcDecl.body.value());
         }
 
         // Function epilogue
         EmitLine(".L" + funcDecl.name + "_exit:");
 
-        // Adjust stack pointer based on total stack size used
-        int totalStackSize = (stackSize + 15) & ~15; // Align to 16 bytes
-        if (totalStackSize > 0) {
-            EmitLine("\tadd sp, sp, #" + std::to_string(totalStackSize));
-        }
-
+        // Restore stack pointer back to frame pointer minus 16 (for saved fp and lr)
+        EmitLine("\tmov sp, x29");
         EmitLine("\tldp x29, x30, [sp], #16");  // Restore frame pointer and link register
 
         if (isMainFunction) {
@@ -298,12 +304,10 @@ private:
                 GenerateStatement(*stmtItem->statement);
             } else if (const auto* declItem = dynamic_cast<const BlockItemDeclaration*>(item.get())) {
                 if (const auto* varDecl = dynamic_cast<const VariableDeclaration*>(declItem->declaration.get())) {
-                    // Allocate space for the variable
-                    AllocateVariable(varDecl->name, GetTypeSize(*varDecl->varType));
-
-                    // Initialize if there's an initializer
+                    // Variable already allocated in pre-scan, just need to handle initialization
                     if (varDecl->initializer.has_value()) {
-                        GenerateInitializer(*varDecl->initializer.value(), GetVariableOffset(varDecl->name).second);
+                        GenerateInitializer(*varDecl->initializer.value(),
+                                          functionVariables[currentFunction][varDecl->name]);
                     }
                 } else {
                     GenerateDeclaration(*declItem->declaration);
@@ -318,7 +322,7 @@ private:
     GenerateInitializer(const Initializer& init, int offset) {
         if (const auto* singleInit = dynamic_cast<const SingleInit*>(&init)) {
             GenerateExpression(*singleInit->expression);
-            EmitLine("\tstr x0, [x29, #" + std::to_string(offset) + "]");
+            EmitLine("\tstr w0, [x29, #" + std::to_string(offset) + "]");
         } else if (const auto* compoundInit = dynamic_cast<const CompoundInit*>(&init)) {
             // Compound initializer (e.g., array or struct)
             int currentOffset = offset;
@@ -520,51 +524,76 @@ private:
 
     static void
     GenerateExpression(const Exp& exp) {
-        if (const auto* constant = dynamic_cast<const Constant*>(&exp)) {
-            GenerateConstant(*constant);
-        } else if (const auto* var = dynamic_cast<const Var*>(&exp)) {
-            auto [isGlobal, offset] = GetVariableOffset(var->name);
-            if (isGlobal) {
-                // Global variable access using a safer approach with explicit label
-                int labelIndex = GetNextLabel();
-                std::string labelName = "Lloadglobal_" + var->name + "_" + std::to_string(labelIndex);
-
-                EmitLine("\tadrp x0, _" + var->name + "@PAGE");
-                EmitLine("\tadd x0, x0, _" + var->name + "@PAGEOFF");
-                EmitLine("\tldr w0, [x0]");
-            } else {
-                // Load local variable
-                EmitLine("\tldr w0, [x29, #" + std::to_string(offset) + "]");
-            }
-        } else if (const auto* binOp = dynamic_cast<const BinOp*>(&exp)) {
-            GenerateBinaryOperation(*binOp);
-        } else if (const auto* unOp = dynamic_cast<const UnOp*>(&exp)) {
-            GenerateUnaryOperation(*unOp);
-        } else if (const auto* assign = dynamic_cast<const Assignment*>(&exp)) {
-            GenerateAssignment(*assign);
-        } else if (const auto* functionCall = dynamic_cast<const FunctionCall*>(&exp)) {
-            GenerateFunctionCall(*functionCall);
-        } else if (const auto* conditional = dynamic_cast<const Conditional*>(&exp)) {
-            GenerateConditionalExpression(*conditional);
-        } else if (const auto* dereference = dynamic_cast<const Dereference*>(&exp)) {
-            GenerateDereference(*dereference);
-        } else if (const auto* addrOf = dynamic_cast<const AddrOf*>(&exp)) {
-            GenerateAddressOf(*addrOf);
-        } else if (const auto* subscript = dynamic_cast<const Subscript*>(&exp)) {
-            GenerateSubscript(*subscript);
-        } else if (const auto* sizeOfExp = dynamic_cast<const SizeOfExp*>(&exp)) {
-            GenerateSizeOfExpression(*sizeOfExp);
-        } else if (const auto* sizeOfType = dynamic_cast<const SizeOfType*>(&exp)) {
-            GenerateSizeOfType(*sizeOfType);
-        } else if (const auto* dot = dynamic_cast<const Dot*>(&exp)) {
-            GenerateDotOperator(*dot);
-        } else if (const auto* arrow = dynamic_cast<const Arrow*>(&exp)) {
-            GenerateArrowOperator(*arrow);
-        } else if (const auto* cast = dynamic_cast<const Cast*>(&exp)) {
-            GenerateCast(*cast);
-        } else if (const auto* stringLiteral = dynamic_cast<const StringLiteral*>(&exp)) {
-            GenerateStringLiteral(*stringLiteral);
+      if (const auto* constant = dynamic_cast<const Constant*>(&exp)) {
+        GenerateConstant(*constant);
+      } else if (const auto* var = dynamic_cast<const Var*>(&exp)) {
+        auto [isGlobal, offset] = GetVariableOffset(var->name);
+        if (isGlobal) {
+          // Global variable access using a safer approach with explicit label
+          EmitLine("\tadrp x0, _" + var->name + "@PAGE");
+          EmitLine("\tadd x0, x0, _" + var->name + "@PAGEOFF");
+          EmitLine("\tldr w0, [x0]");
+        } else {
+          // Load local variable
+          EmitLine("\tldr w0, [x29, #" + std::to_string(offset) + "]");
         }
+      } else if (const auto* binOp = dynamic_cast<const BinOp*>(&exp)) {
+        GenerateBinaryOperation(*binOp);
+      } else if (const auto* unOp = dynamic_cast<const UnOp*>(&exp)) {
+        GenerateUnaryOperation(*unOp);
+      } else if (const auto* assign = dynamic_cast<const Assignment*>(&exp)) {
+        GenerateAssignment(*assign);
+      } else if (const auto* functionCall = dynamic_cast<const FunctionCall*>(&exp)) {
+        GenerateFunctionCall(*functionCall);
+      } else if (const auto* conditional = dynamic_cast<const Conditional*>(&exp)) {
+        GenerateConditionalExpression(*conditional);
+      } else if (const auto* dereference = dynamic_cast<const Dereference*>(&exp)) {
+        GenerateDereference(*dereference);
+      } else if (const auto* addrOf = dynamic_cast<const AddrOf*>(&exp)) {
+        GenerateAddressOf(*addrOf);
+      } else if (const auto* subscript = dynamic_cast<const Subscript*>(&exp)) {
+        GenerateSubscript(*subscript);
+      } else if (const auto* sizeOfExp = dynamic_cast<const SizeOfExp*>(&exp)) {
+        GenerateSizeOfExpression(*sizeOfExp);
+      } else if (const auto* sizeOfType = dynamic_cast<const SizeOfType*>(&exp)) {
+        GenerateSizeOfType(*sizeOfType);
+      } else if (const auto* dot = dynamic_cast<const Dot*>(&exp)) {
+        GenerateDotOperator(*dot);
+      } else if (const auto* arrow = dynamic_cast<const Arrow*>(&exp)) {
+        GenerateArrowOperator(*arrow);
+      } else if (const auto* cast = dynamic_cast<const Cast*>(&exp)) {
+        GenerateCast(*cast);
+      } else if (const auto* stringLiteral = dynamic_cast<const StringLiteral*>(&exp)) {
+        GenerateStringLiteral(*stringLiteral);
+      } else if (const auto* binOp = dynamic_cast<const BinOp*>(&exp)) {
+        GenerateBinaryOperation(*binOp);
+      } else if (const auto* unOp = dynamic_cast<const UnOp*>(&exp)) {
+        GenerateUnaryOperation(*unOp);
+      } else if (const auto* assign = dynamic_cast<const Assignment*>(&exp)) {
+        GenerateAssignment(*assign);
+      } else if (const auto* functionCall = dynamic_cast<const FunctionCall*>(&exp)) {
+        GenerateFunctionCall(*functionCall);
+      } else if (const auto* conditional = dynamic_cast<const Conditional*>(&exp)) {
+        GenerateConditionalExpression(*conditional);
+      } else if (const auto* dereference = dynamic_cast<const Dereference*>(&exp)) {
+        GenerateDereference(*dereference);
+      } else if (const auto* addrOf = dynamic_cast<const AddrOf*>(&exp)) {
+        GenerateAddressOf(*addrOf);
+      } else if (const auto* subscript = dynamic_cast<const Subscript*>(&exp)) {
+        GenerateSubscript(*subscript);
+      } else if (const auto* sizeOfExp = dynamic_cast<const SizeOfExp*>(&exp)) {
+        GenerateSizeOfExpression(*sizeOfExp);
+      } else if (const auto* sizeOfType = dynamic_cast<const SizeOfType*>(&exp)) {
+        GenerateSizeOfType(*sizeOfType);
+      } else if (const auto* dot = dynamic_cast<const Dot*>(&exp)) {
+        GenerateDotOperator(*dot);
+      } else if (const auto* arrow = dynamic_cast<const Arrow*>(&exp)) {
+        GenerateArrowOperator(*arrow);
+      } else if (const auto* cast = dynamic_cast<const Cast*>(&exp)) {
+        GenerateCast(*cast);
+      } else if (const auto* stringLiteral = dynamic_cast<const StringLiteral*>(&exp)) {
+        GenerateStringLiteral(*stringLiteral);
+      }
     }
 
     static void
@@ -989,6 +1018,22 @@ private:
                     break;
             }
         }
+    }
+  static void
+    PreScanForVariables(const Block& block) {
+      for (const auto& item : block.items) {
+        if (const auto* declItem = dynamic_cast<const BlockItemDeclaration*>(item.get())) {
+          if (const auto* varDecl = dynamic_cast<const VariableDeclaration*>(declItem->declaration.get())) {
+            // Record variable without generating code
+            AllocateVariable(varDecl->name, GetTypeSize(*varDecl->varType));
+          }
+        } else if (const auto* stmtItem = dynamic_cast<const BlockItemStatement*>(item.get())) {
+          if (const auto* compoundStmt = dynamic_cast<const CompoundStatement*>(stmtItem->statement.get())) {
+            // Recursively scan nested blocks
+            PreScanForVariables(*compoundStmt->block);
+          }
+        }
+      }
     }
 };
 
