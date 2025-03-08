@@ -29,9 +29,8 @@ public:
             }
         }
 
-        // Global directives
-        EmitLine("\t.arch armv8-a");
-        EmitLine("\t.text");
+        // Global directives for macOS/iOS ARM64
+        EmitLine("\t.section __TEXT,__text");
         EmitLine("\t.align 4");
 
         // Generate code for each declaration
@@ -152,9 +151,10 @@ private:
             // Record this as a global variable
             globalVariables[varDecl.name] = varDecl.name;
 
-            EmitLine("\t.data");
+            // Switch to data section
+            EmitLine("\t.section __DATA,__data");
             EmitLine("\t.align 3");
-            EmitLine("\t.global _" + varDecl.name);
+            EmitLine("\t.globl _" + varDecl.name);  // Using .globl instead of .global for Apple syntax
             EmitLine("_" + varDecl.name + ":");
 
             int size = GetTypeSize(*varDecl.varType);
@@ -179,7 +179,8 @@ private:
             } else {
                 EmitLine("\t.skip " + std::to_string(size) + ", 0");
             }
-            EmitLine("\t.text");
+            // Switch back to text section
+            EmitLine("\t.section __TEXT,__text");
         } else {
             // Local variables are handled in statement generation
         }
@@ -206,7 +207,7 @@ private:
         bool isMainFunction = (funcDecl.name == "main");
 
         // Function entry
-        EmitLine("\t.global _" + funcDecl.name);
+        EmitLine("\t.globl _" + funcDecl.name);  // Using .globl for Apple macOS/iOS syntax
         EmitLine("_" + funcDecl.name + ":");
 
         // Function prologue
