@@ -66,7 +66,7 @@ public:
 
         // Text section for code
         EmitLine("\t.text");
-        EmitLine("\t.p2align 2");  // Align to 4-byte boundary
+        EmitLine("\t.p2align 3");  // Align to 8-byte boundary (2^3)
 
         // Generate code for function declarations
         for (const auto& decl : program->declarations) {
@@ -247,14 +247,6 @@ private:
         // Function prologue
         EmitLine("\tstp x29, x30, [sp, #-16]!"); // Save frame pointer and link register
         EmitLine("\tmov x29, sp");               // Set up frame pointer
-
-        // Add pointers to all globals used in this function, with literal label syntax
-        for (const auto& [name, _] : globalVariables) {
-            // Use a literal pool approach
-            EmitLine("Lptr_" + name + "_" + std::to_string(labelCounter) + ":");
-            EmitLine("\t.quad _" + name);
-            labelCounter++;
-        }
 
         // Allocate space for parameters
         for (size_t i = 0; i < funcDecl.parameters.size(); i++) {
