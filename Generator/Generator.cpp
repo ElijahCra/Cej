@@ -38,6 +38,7 @@ private:
     inline static std::stringstream assembly;
     inline static std::unordered_map<std::string, std::unordered_map<std::string, int>> functionVariables;
     inline static std::unordered_map<std::string, std::unordered_map<std::string, int>> structOffsets;
+    inline static std::unordered_map<std::string, std::string> globalVariables; // Track global variables
     inline static int stackSize;
     inline static int labelCounter;
     inline static std::string currentFunction;
@@ -50,6 +51,7 @@ private:
     static void Reset() {
         functionVariables.clear();
         structOffsets.clear();
+        globalVariables.clear();
         stackSize = 0;
         labelCounter = 0;
         currentFunction = "";
@@ -81,12 +83,20 @@ private:
         functionVariables[currentFunction][name] = -stackSize;
     }
 
-    static int
+    static std::pair<bool, int>
     GetVariableOffset(const std::string& name) {
+        // First check if it's a local variable
         auto it = functionVariables[currentFunction].find(name);
         if (it != functionVariables[currentFunction].end()) {
-            return it->second;
+            return {false, it->second}; // false = local variable (not global)
         }
+
+        // Check if it's a global variable
+        auto globalIt = globalVariables.find(name);
+        if (globalIt != globalVariables.end()) {
+            return {true, 0}; // true = global variable
+        }
+
         throw std::runtime_error("Variable not found: " + name);
     }
 
@@ -131,6 +141,9 @@ private:
     GenerateVariableDeclaration(const VariableDeclaration& varDecl) {
         // For global variables - not in a function context
         if (currentFunction.empty()) {
+            // Record this as a global variable
+            globalVariables[varDecl.name] = varDecl.name;
+
             EmitLine("\t.data");
             EmitLine("\t.align 3");
             EmitLine("\t.global _" + varDecl.name);
@@ -138,8 +151,23 @@ private:
 
             int size = GetTypeSize(*varDecl.varType);
             if (varDecl.initializer.has_value()) {
-                // TODO: Handle initializers for global variables
-                EmitLine("\t.skip " + std::to_string(size) + ", 0");
+                // For global initializers, we need to emit the value directly
+                if (const auto* singleInit = dynamic_cast<const SingleInit*>(varDecl.initializer.value().get())) {
+                    if (const auto* constant = dynamic_cast<const Constant*>(singleInit->expression.get())) {
+                        // If it's a simple constant, emit it directly
+                        int value = 0;
+                        if (constant->type == ConstantType::Int) {
+                            value = std::get<int>(constant->value);
+                        }
+                        // For simplicity, we're just handling integers
+                        EmitLine("\t.long " + std::to_string(value));
+                    } else {
+                        // More complex initializers would need evaluation at compile time
+                        EmitLine("\t.skip " + std::to_string(size) + ", 0");
+                    }
+                } else {
+                    EmitLine("\t.skip " + std::to_string(size) + ", 0");
+                }
             } else {
                 EmitLine("\t.skip " + std::to_string(size) + ", 0");
             }
@@ -236,7 +264,7 @@ private:
 
                     // Initialize if there's an initializer
                     if (varDecl->initializer.has_value()) {
-                        GenerateInitializer(*varDecl->initializer.value(), GetVariableOffset(varDecl->name));
+                        GenerateInitializer(*varDecl->initializer.value(), GetVariableOffset(varDecl->name).second);
                     }
                 } else {
                     GenerateDeclaration(*declItem->declaration);
@@ -413,7 +441,7 @@ private:
             AllocateVariable(initDecl->declaration->name, GetTypeSize(*initDecl->declaration->varType));
             if (initDecl->declaration->initializer.has_value()) {
                 GenerateInitializer(*initDecl->declaration->initializer.value(),
-                    GetVariableOffset(initDecl->declaration->name));
+                    GetVariableOffset(initDecl->declaration->name).second);
             }
         } else if (const auto* initExp = dynamic_cast<const InitExp*>(forStmt.init.get())) {
             if (initExp->expression.has_value()) {
@@ -456,8 +484,16 @@ private:
         if (const auto* constant = dynamic_cast<const Constant*>(&exp)) {
             GenerateConstant(*constant);
         } else if (const auto* var = dynamic_cast<const Var*>(&exp)) {
-            int offset = GetVariableOffset(var->name);
-            EmitLine("\tldr x0, [x29, #" + std::to_string(offset) + "]");
+            auto [isGlobal, offset] = GetVariableOffset(var->name);
+            if (isGlobal) {
+                // Load global variable address
+                EmitLine("\tadrp x0, _" + var->name + "@PAGE");
+                EmitLine("\tadd x0, x0, _" + var->name + "@PAGEOFF");
+                EmitLine("\tldr x0, [x0]");
+            } else {
+                // Load local variable
+                EmitLine("\tldr x0, [x29, #" + std::to_string(offset) + "]");
+            }
         } else if (const auto* binOp = dynamic_cast<const BinOp*>(&exp)) {
             GenerateBinaryOperation(*binOp);
         } else if (const auto* unOp = dynamic_cast<const UnOp*>(&exp)) {
@@ -639,8 +675,20 @@ private:
         // Store the result back based on the type of left-hand side
         if (const auto* var = dynamic_cast<const Var*>(assign.lhs.get())) {
             // Simple variable assignment
-            int offset = GetVariableOffset(var->name);
-            EmitLine("\tstr x0, [x29, #" + std::to_string(offset) + "]");
+            auto [isGlobal, offset] = GetVariableOffset(var->name);
+            if (isGlobal) {
+                // Save result in x1 temporarily
+                EmitLine("\tmov x1, x0");
+                // Load global variable address
+                EmitLine("\tadrp x0, _" + var->name + "@PAGE");
+                EmitLine("\tadd x0, x0, _" + var->name + "@PAGEOFF");
+                // Store value to global variable
+                EmitLine("\tstr x1, [x0]");
+                // Put result back in x0
+                EmitLine("\tmov x0, x1");
+            } else {
+                EmitLine("\tstr x0, [x29, #" + std::to_string(offset) + "]");
+            }
         } else if (const auto* dereference = dynamic_cast<const Dereference*>(assign.lhs.get())) {
             // Pointer dereference assignment: *ptr = value
             // Push value to stack
@@ -797,7 +845,7 @@ private:
     static void
     GenerateAddressOf(const AddrOf& addrOf) {
         if (const auto* var = dynamic_cast<const Var*>(addrOf.expression.get())) {
-            int offset = GetVariableOffset(var->name);
+            int offset = GetVariableOffset(var->name).second;
             EmitLine("\tadd x0, x29, #" + std::to_string(offset));
         } else {
             // More complex address-of operations would need special handling
