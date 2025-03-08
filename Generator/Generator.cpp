@@ -29,9 +29,11 @@ public:
             }
         }
 
-        // Data section first for global variables
+        // Add format string for printf in data section
         EmitLine("\t.data");
         EmitLine("\t.p2align 2");  // Align to 4-byte boundary
+        EmitLine("L_.str:");
+        EmitLine("\t.asciz \"Result: %d\\n\"");  // Format string for printing integers
 
         // Generate all global variables
         for (const auto& decl : program->declarations) {
@@ -67,6 +69,9 @@ public:
         // Text section for code
         EmitLine("\t.text");
         EmitLine("\t.p2align 3");  // Align to 8-byte boundary (2^3)
+
+        // Add external reference to printf
+        EmitLine("\t.extern _printf");
 
         // Generate code for function declarations
         for (const auto& decl : program->declarations) {
@@ -276,6 +281,16 @@ private:
 
             // Generate the actual code
             GenerateBlock(*funcDecl.body.value());
+        }
+
+        // For main function, print the return value
+        if (isMainFunction) {
+            // Print the return value (x0 already contains it)
+            EmitLine("\t// Print the return value");
+            EmitLine("\tmov x1, x0");  // Move return value to x1 (second printf arg)
+            EmitLine("\tadrp x0, L_.str@PAGE");
+            EmitLine("\tadd x0, x0, L_.str@PAGEOFF");
+            EmitLine("\tbl _printf");
         }
 
         // Function epilogue
@@ -524,76 +539,76 @@ private:
 
     static void
     GenerateExpression(const Exp& exp) {
-      if (const auto* constant = dynamic_cast<const Constant*>(&exp)) {
-        GenerateConstant(*constant);
-      } else if (const auto* var = dynamic_cast<const Var*>(&exp)) {
-        auto [isGlobal, offset] = GetVariableOffset(var->name);
-        if (isGlobal) {
-          // Global variable access using a safer approach with explicit label
-          EmitLine("\tadrp x0, _" + var->name + "@PAGE");
-          EmitLine("\tadd x0, x0, _" + var->name + "@PAGEOFF");
-          EmitLine("\tldr w0, [x0]");
-        } else {
-          // Load local variable
-          EmitLine("\tldr w0, [x29, #" + std::to_string(offset) + "]");
+        if (const auto* constant = dynamic_cast<const Constant*>(&exp)) {
+            GenerateConstant(*constant);
+        } else if (const auto* var = dynamic_cast<const Var*>(&exp)) {
+            auto [isGlobal, offset] = GetVariableOffset(var->name);
+            if (isGlobal) {
+                // Global variable access using a safer approach with explicit label
+                EmitLine("\tadrp x0, _" + var->name + "@PAGE");
+                EmitLine("\tadd x0, x0, _" + var->name + "@PAGEOFF");
+                EmitLine("\tldr w0, [x0]");
+            } else {
+                // Load local variable
+                EmitLine("\tldr w0, [x29, #" + std::to_string(offset) + "]");
+            }
+        } else if (const auto* binOp = dynamic_cast<const BinOp*>(&exp)) {
+            GenerateBinaryOperation(*binOp);
+        } else if (const auto* unOp = dynamic_cast<const UnOp*>(&exp)) {
+            GenerateUnaryOperation(*unOp);
+        } else if (const auto* assign = dynamic_cast<const Assignment*>(&exp)) {
+            GenerateAssignment(*assign);
+        } else if (const auto* functionCall = dynamic_cast<const FunctionCall*>(&exp)) {
+            GenerateFunctionCall(*functionCall);
+        } else if (const auto* conditional = dynamic_cast<const Conditional*>(&exp)) {
+            GenerateConditionalExpression(*conditional);
+        } else if (const auto* dereference = dynamic_cast<const Dereference*>(&exp)) {
+            GenerateDereference(*dereference);
+        } else if (const auto* addrOf = dynamic_cast<const AddrOf*>(&exp)) {
+            GenerateAddressOf(*addrOf);
+        } else if (const auto* subscript = dynamic_cast<const Subscript*>(&exp)) {
+            GenerateSubscript(*subscript);
+        } else if (const auto* sizeOfExp = dynamic_cast<const SizeOfExp*>(&exp)) {
+            GenerateSizeOfExpression(*sizeOfExp);
+        } else if (const auto* sizeOfType = dynamic_cast<const SizeOfType*>(&exp)) {
+            GenerateSizeOfType(*sizeOfType);
+        } else if (const auto* dot = dynamic_cast<const Dot*>(&exp)) {
+            GenerateDotOperator(*dot);
+        } else if (const auto* arrow = dynamic_cast<const Arrow*>(&exp)) {
+            GenerateArrowOperator(*arrow);
+        } else if (const auto* cast = dynamic_cast<const Cast*>(&exp)) {
+            GenerateCast(*cast);
+        } else if (const auto* stringLiteral = dynamic_cast<const StringLiteral*>(&exp)) {
+            GenerateStringLiteral(*stringLiteral);
+        } else if (const auto* binOp = dynamic_cast<const BinOp*>(&exp)) {
+            GenerateBinaryOperation(*binOp);
+        } else if (const auto* unOp = dynamic_cast<const UnOp*>(&exp)) {
+            GenerateUnaryOperation(*unOp);
+        } else if (const auto* assign = dynamic_cast<const Assignment*>(&exp)) {
+            GenerateAssignment(*assign);
+        } else if (const auto* functionCall = dynamic_cast<const FunctionCall*>(&exp)) {
+            GenerateFunctionCall(*functionCall);
+        } else if (const auto* conditional = dynamic_cast<const Conditional*>(&exp)) {
+            GenerateConditionalExpression(*conditional);
+        } else if (const auto* dereference = dynamic_cast<const Dereference*>(&exp)) {
+            GenerateDereference(*dereference);
+        } else if (const auto* addrOf = dynamic_cast<const AddrOf*>(&exp)) {
+            GenerateAddressOf(*addrOf);
+        } else if (const auto* subscript = dynamic_cast<const Subscript*>(&exp)) {
+            GenerateSubscript(*subscript);
+        } else if (const auto* sizeOfExp = dynamic_cast<const SizeOfExp*>(&exp)) {
+            GenerateSizeOfExpression(*sizeOfExp);
+        } else if (const auto* sizeOfType = dynamic_cast<const SizeOfType*>(&exp)) {
+            GenerateSizeOfType(*sizeOfType);
+        } else if (const auto* dot = dynamic_cast<const Dot*>(&exp)) {
+            GenerateDotOperator(*dot);
+        } else if (const auto* arrow = dynamic_cast<const Arrow*>(&exp)) {
+            GenerateArrowOperator(*arrow);
+        } else if (const auto* cast = dynamic_cast<const Cast*>(&exp)) {
+            GenerateCast(*cast);
+        } else if (const auto* stringLiteral = dynamic_cast<const StringLiteral*>(&exp)) {
+            GenerateStringLiteral(*stringLiteral);
         }
-      } else if (const auto* binOp = dynamic_cast<const BinOp*>(&exp)) {
-        GenerateBinaryOperation(*binOp);
-      } else if (const auto* unOp = dynamic_cast<const UnOp*>(&exp)) {
-        GenerateUnaryOperation(*unOp);
-      } else if (const auto* assign = dynamic_cast<const Assignment*>(&exp)) {
-        GenerateAssignment(*assign);
-      } else if (const auto* functionCall = dynamic_cast<const FunctionCall*>(&exp)) {
-        GenerateFunctionCall(*functionCall);
-      } else if (const auto* conditional = dynamic_cast<const Conditional*>(&exp)) {
-        GenerateConditionalExpression(*conditional);
-      } else if (const auto* dereference = dynamic_cast<const Dereference*>(&exp)) {
-        GenerateDereference(*dereference);
-      } else if (const auto* addrOf = dynamic_cast<const AddrOf*>(&exp)) {
-        GenerateAddressOf(*addrOf);
-      } else if (const auto* subscript = dynamic_cast<const Subscript*>(&exp)) {
-        GenerateSubscript(*subscript);
-      } else if (const auto* sizeOfExp = dynamic_cast<const SizeOfExp*>(&exp)) {
-        GenerateSizeOfExpression(*sizeOfExp);
-      } else if (const auto* sizeOfType = dynamic_cast<const SizeOfType*>(&exp)) {
-        GenerateSizeOfType(*sizeOfType);
-      } else if (const auto* dot = dynamic_cast<const Dot*>(&exp)) {
-        GenerateDotOperator(*dot);
-      } else if (const auto* arrow = dynamic_cast<const Arrow*>(&exp)) {
-        GenerateArrowOperator(*arrow);
-      } else if (const auto* cast = dynamic_cast<const Cast*>(&exp)) {
-        GenerateCast(*cast);
-      } else if (const auto* stringLiteral = dynamic_cast<const StringLiteral*>(&exp)) {
-        GenerateStringLiteral(*stringLiteral);
-      } else if (const auto* binOp = dynamic_cast<const BinOp*>(&exp)) {
-        GenerateBinaryOperation(*binOp);
-      } else if (const auto* unOp = dynamic_cast<const UnOp*>(&exp)) {
-        GenerateUnaryOperation(*unOp);
-      } else if (const auto* assign = dynamic_cast<const Assignment*>(&exp)) {
-        GenerateAssignment(*assign);
-      } else if (const auto* functionCall = dynamic_cast<const FunctionCall*>(&exp)) {
-        GenerateFunctionCall(*functionCall);
-      } else if (const auto* conditional = dynamic_cast<const Conditional*>(&exp)) {
-        GenerateConditionalExpression(*conditional);
-      } else if (const auto* dereference = dynamic_cast<const Dereference*>(&exp)) {
-        GenerateDereference(*dereference);
-      } else if (const auto* addrOf = dynamic_cast<const AddrOf*>(&exp)) {
-        GenerateAddressOf(*addrOf);
-      } else if (const auto* subscript = dynamic_cast<const Subscript*>(&exp)) {
-        GenerateSubscript(*subscript);
-      } else if (const auto* sizeOfExp = dynamic_cast<const SizeOfExp*>(&exp)) {
-        GenerateSizeOfExpression(*sizeOfExp);
-      } else if (const auto* sizeOfType = dynamic_cast<const SizeOfType*>(&exp)) {
-        GenerateSizeOfType(*sizeOfType);
-      } else if (const auto* dot = dynamic_cast<const Dot*>(&exp)) {
-        GenerateDotOperator(*dot);
-      } else if (const auto* arrow = dynamic_cast<const Arrow*>(&exp)) {
-        GenerateArrowOperator(*arrow);
-      } else if (const auto* cast = dynamic_cast<const Cast*>(&exp)) {
-        GenerateCast(*cast);
-      } else if (const auto* stringLiteral = dynamic_cast<const StringLiteral*>(&exp)) {
-        GenerateStringLiteral(*stringLiteral);
-      }
     }
 
     static void
