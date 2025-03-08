@@ -11,7 +11,7 @@ void BuildTarget::GenerateAssembly(const std::filesystem::path& buildDir) {
   for (const auto& source : sources) {
     Lexer lexer(source);
     Parser parser(lexer);
-    auto tree = parser.parseUnit();
+    auto tree = parser.parseProgram();
     std::string outData = Generator::GenerateAssembly(tree);
 
     // Generate output filename

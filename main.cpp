@@ -4,6 +4,7 @@
 //#include "Generator/Generator.cpp"
 #include "Parser/Parser.cpp"
 #include "Analyzer/SemanticAnalyzer.hpp"
+#include "Builder/BuildSystem.cpp"
 
 int main(int argc, char *argv[]) {
   if (1 == argc && **argv == '/') {
@@ -28,10 +29,10 @@ int main(int argc, char *argv[]) {
     auto tree = parser.parseProgram();
     SemanticAnalyzer analyzer;
     analyzer.analyze(*tree);
-    //BuildSystem buildSystem;
-    //buildSystem.ParseBuildFile(std::string(argv[2]));
-    //buildSystem.BuildAll();
-    //buildSystem.GenerateMakefile("Makefile");
+    BuildSystem buildSystem;
+    buildSystem.ParseBuildFile(std::string(argv[2]));
+    buildSystem.BuildAll();
+    buildSystem.GenerateMakefile("Makefile");
     return 0;
   }
 
