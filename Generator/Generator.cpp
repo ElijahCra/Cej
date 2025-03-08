@@ -21,6 +21,14 @@ public:
         assembly.clear();
         Reset();
 
+        // First pass: Register all global variables
+        for (const auto& decl : program->declarations) {
+            if (const auto* varDecl = dynamic_cast<const VariableDeclaration*>(decl.get())) {
+                // Add to global variables map
+                globalVariables[varDecl->name] = varDecl->name;
+            }
+        }
+
         // Global directives
         EmitLine("\t.arch armv8-a");
         EmitLine("\t.text");
